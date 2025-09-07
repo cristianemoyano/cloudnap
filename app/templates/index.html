@@ -19,9 +19,45 @@
                 <h5 class="mb-0">
                     <i class="bi bi-server"></i> Clusters
                 </h5>
-                <button class="btn btn-sm btn-outline-primary" onclick="refreshClusters()">
-                    <i class="bi bi-arrow-clockwise"></i> Refresh
-                </button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#cronHelp" aria-expanded="false">
+                        <i class="bi bi-question-circle"></i> Cron Help
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" disabled title="Language support coming soon">
+                        <i class="bi bi-translate"></i> <span id="langToggle">EN</span>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshClusters()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="collapse" id="cronHelp">
+                <div class="card-body bg-light">
+                    <h6><i class="bi bi-info-circle"></i> Cron Schedule Format</h6>
+                    <p class="mb-2">Cron expressions use the format: <code>minute hour day month day-of-week</code></p>
+                    <p class="mb-2"><i class="bi bi-clock"></i> <strong>Timezone:</strong> All schedules are executed in <code>{{ timezone }}</code> timezone.</p>
+                    <p class="mb-2"><i class="bi bi-clock-history"></i> <strong>Current time:</strong> <span id="currentTime">{{ timezone }}</span></p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Common Examples:</strong>
+                            <ul class="mb-0">
+                                <li><code>0 8 * * 1-5</code> - Weekdays at 8:00 AM</li>
+                                <li><code>0 18 * * 1-5</code> - Weekdays at 6:00 PM</li>
+                                <li><code>0 2 * * 1</code> - Every Monday at 2:00 AM</li>
+                                <li><code>0 0 1 * *</code> - First day of month at midnight</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Symbols:</strong>
+                            <ul class="mb-0">
+                                <li><code>*</code> - Any value</li>
+                                <li><code>1-5</code> - Range (1 to 5)</li>
+                                <li><code>0,6</code> - List (0 and 6)</li>
+                                <li><code>*/15</code> - Every 15 units</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
                 {% if clusters %}
@@ -66,6 +102,39 @@
                                             {% endfor %}
                                         </div>
                                     </div>
+                                    
+                                    {% if cluster.schedule %}
+                                    <div class="mb-2">
+                                        <strong>Schedule:</strong>
+                                        <div class="mt-1">
+                                            <small class="text-muted mb-1 d-block">
+                                                <i class="bi bi-clock"></i> Timezone: <strong>{{ timezone }}</strong>
+                                            </small>
+                                            {% if cluster.schedule.wake_up %}
+                                            <small class="d-block">
+                                                <i class="bi bi-sunrise text-warning" title="Wake up schedule"></i>
+                                                <strong>Wake up:</strong> 
+                                                <code class="schedule-cron">{{ cluster.schedule.wake_up }}</code>
+                                                <i class="bi bi-info-circle text-muted schedule-info" 
+                                                   data-cron="{{ cluster.schedule.wake_up }}" 
+                                                   data-type="wake_up"
+                                                   title="Click to see human readable description"></i>
+                                            </small>
+                                            {% endif %}
+                                            {% if cluster.schedule.shutdown %}
+                                            <small class="d-block">
+                                                <i class="bi bi-moon text-info" title="Shutdown schedule"></i>
+                                                <strong>Shutdown:</strong> 
+                                                <code class="schedule-cron">{{ cluster.schedule.shutdown }}</code>
+                                                <i class="bi bi-info-circle text-muted schedule-info" 
+                                                   data-cron="{{ cluster.schedule.shutdown }}" 
+                                                   data-type="shutdown"
+                                                   title="Click to see human readable description"></i>
+                                            </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 <div class="card-footer">
                                     <div class="btn-group w-100" role="group">
@@ -191,8 +260,38 @@
 
 {% block scripts %}
 <script>
+// Global variables
+let currentCronLanguage = 'en';
+const timezone = '{{ timezone }}';
+
 function refreshClusters() {
     location.reload();
+}
+
+function toggleCronLanguage() {
+    // For now, we'll keep it simple and just use English
+    // In the future, we could implement a custom Spanish translator
+    currentCronLanguage = 'en';
+    document.getElementById('langToggle').textContent = 'EN';
+    
+    // Update all visible descriptions
+    document.querySelectorAll('.schedule-description.show').forEach(desc => {
+        const cronExpr = desc.getAttribute('data-cron');
+        if (cronExpr) {
+            const newDescription = parseCronExpression(cronExpr);
+            // Extract the type from the current description
+            const typeMatch = desc.innerHTML.match(/bi-(sunrise|moon)/);
+            const type = typeMatch ? (typeMatch[1] === 'sunrise' ? 'wake_up' : 'shutdown') : 'wake_up';
+            
+            desc.innerHTML = `
+                <i class="bi bi-${type === 'wake_up' ? 'sunrise' : 'moon'} me-1"></i>
+                <strong>${type === 'wake_up' ? 'Wake up' : 'Shutdown'}:</strong> ${newDescription}<br>
+                <small class="text-muted">
+                    <i class="bi bi-clock"></i> Timezone: <strong>${timezone}</strong>
+                </small>
+            `;
+        }
+    });
 }
 
 function triggerJob(jobId) {
@@ -217,6 +316,162 @@ function triggerJob(jobId) {
         });
     }
 }
+
+// Function to parse and display cron expression in human readable format using cronstrue
+function parseCronExpression(cronExpr) {
+    // Check if cronstrue is available
+    if (typeof cronstrue === 'undefined') {
+        console.warn('cronstrue library not loaded, using fallback parser');
+        return parseCronExpressionFallback(cronExpr);
+    }
+    
+    try {
+        // Use cronstrue library for professional cron parsing (English only for now)
+        return cronstrue.toString(cronExpr, {
+            throwExceptionOnParseError: false,
+            use24HourTimeFormat: false,
+            locale: 'en'
+        });
+    } catch (error) {
+        console.warn('Failed to parse cron expression with cronstrue:', cronExpr, error);
+        return parseCronExpressionFallback(cronExpr);
+    }
+}
+
+// Fallback parser for when cronstrue is not available
+function parseCronExpressionFallback(cronExpr) {
+    const parts = cronExpr.split(' ');
+    if (parts.length !== 5) return cronExpr;
+    
+    const [minute, hour, day, month, dayOfWeek] = parts;
+    let description = '';
+    
+    // Parse time
+    if (minute === '0' && hour !== '*') {
+        const hourInt = parseInt(hour);
+        if (hourInt === 0) {
+            description += 'At midnight (12:00 AM)';
+        } else if (hourInt < 12) {
+            description += `At ${hourInt}:00 AM`;
+        } else if (hourInt === 12) {
+            description += 'At noon (12:00 PM)';
+        } else {
+            description += `At ${hourInt - 12}:00 PM`;
+        }
+    } else if (minute !== '*' && hour !== '*') {
+        const hourInt = parseInt(hour);
+        if (hourInt === 0) {
+            description += `At 12:${minute.padStart(2, '0')} AM`;
+        } else if (hourInt < 12) {
+            description += `At ${hourInt}:${minute.padStart(2, '0')} AM`;
+        } else if (hourInt === 12) {
+            description += `At 12:${minute.padStart(2, '0')} PM`;
+        } else {
+            description += `At ${hourInt - 12}:${minute.padStart(2, '0')} PM`;
+        }
+    } else {
+        description += 'At specified time';
+    }
+    
+    // Parse day of week
+    if (dayOfWeek === '1-5') {
+        description += ' on weekdays (Monday to Friday)';
+    } else if (dayOfWeek === '0' || dayOfWeek === '7') {
+        description += ' on Sundays';
+    } else if (dayOfWeek === '1') {
+        description += ' on Mondays';
+    } else if (dayOfWeek === '6') {
+        description += ' on Saturdays';
+    } else if (dayOfWeek === '0,6') {
+        description += ' on weekends (Saturday and Sunday)';
+    } else if (dayOfWeek !== '*') {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        description += ` on ${dayNames[parseInt(dayOfWeek)] || `day ${dayOfWeek}`}`;
+    }
+    
+    return description || cronExpr;
+}
+
+// Function to update current time display
+function updateCurrentTime() {
+    const now = new Date();
+    const timeString = now.toLocaleString('en-US', {
+        timeZone: timezone,
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
+    
+    const currentTimeElement = document.getElementById('currentTime');
+    if (currentTimeElement) {
+        currentTimeElement.textContent = timeString;
+    }
+}
+
+// Add click handlers for schedule info icons
+document.addEventListener('DOMContentLoaded', function() {
+    // Update current time immediately and then every second
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 1000);
+    
+    // Wait a bit for external libraries to load
+    setTimeout(function() {
+        // Check if cronstrue loaded successfully
+        if (typeof cronstrue !== 'undefined') {
+            console.log('cronstrue library loaded successfully');
+        } else {
+            console.warn('cronstrue library failed to load, using fallback parser');
+        }
+        
+        const infoIcons = document.querySelectorAll('.schedule-info');
+        infoIcons.forEach(icon => {
+        icon.addEventListener('click', function() {
+            const cronExpr = this.getAttribute('data-cron');
+            const type = this.getAttribute('data-type');
+            const description = parseCronExpression(cronExpr);
+            
+            // Find or create description element
+            let descElement = this.parentElement.querySelector('.schedule-description');
+            if (!descElement) {
+                descElement = document.createElement('div');
+                descElement.className = 'schedule-description';
+                this.parentElement.appendChild(descElement);
+            }
+            
+            // Toggle description
+            if (descElement.classList.contains('show')) {
+                descElement.classList.remove('show');
+                this.classList.remove('text-primary');
+            } else {
+                // Hide all other descriptions first
+                document.querySelectorAll('.schedule-description.show').forEach(el => {
+                    el.classList.remove('show');
+                });
+                document.querySelectorAll('.schedule-info.text-primary').forEach(el => {
+                    el.classList.remove('text-primary');
+                });
+                
+                // Show this description with timezone info
+                descElement.innerHTML = `
+                    <i class="bi bi-${type === 'wake_up' ? 'sunrise' : 'moon'} me-1"></i>
+                    <strong>${type === 'wake_up' ? 'Wake up' : 'Shutdown'}:</strong> ${description}<br>
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i> Timezone: <strong>${timezone}</strong>
+                    </small>
+                `;
+                descElement.setAttribute('data-cron', cronExpr);
+                descElement.classList.add('show');
+                this.classList.add('text-primary');
+            }
+        });
+    });
+    }, 100); // Small delay to ensure external libraries are loaded
+});
 
 // Auto-refresh every 30 seconds
 setInterval(function() {

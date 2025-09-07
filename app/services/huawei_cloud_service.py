@@ -118,6 +118,7 @@ class HuaweiCloudService:
             "region": cluster.region,
             "tags": cluster.tags,
             "enabled": cluster.enabled,
+            "schedule": cluster.schedule,
             "instances": [],
             "overall_status": "unknown"
         }

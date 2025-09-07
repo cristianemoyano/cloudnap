@@ -35,14 +35,16 @@ def index():
         return render_template('index.html', 
                              clusters=clusters_status,
                              scheduled_jobs=scheduled_jobs,
-                             recent_logs=recent_logs)
+                             recent_logs=recent_logs,
+                             timezone=config.scheduler.timezone)
     except Exception as e:
         logger.error(f"Failed to load dashboard: {e}")
         flash(f'Error loading dashboard: {e}', 'error')
         return render_template('index.html', 
                              clusters=[], 
                              scheduled_jobs=[], 
-                             recent_logs=[])
+                             recent_logs=[],
+                             timezone=config.scheduler.timezone)
 
 
 @main_bp.route('/cluster/<cluster_name>/start', methods=['POST'])

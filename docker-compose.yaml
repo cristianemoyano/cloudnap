@@ -1,6 +1,4 @@
 # CloudNap - Development Docker Compose
-version: '3.8'
-
 services:
   cloudnap:
     build:
@@ -9,16 +7,13 @@ services:
       target: runtime
     container_name: cloudnap-dev
     ports:
-      - "5000:5000"
+      - "7180:7180"
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=true
       - HUAWEI_ACCESS_KEY=${HUAWEI_ACCESS_KEY}
       - HUAWEI_SECRET_KEY=${HUAWEI_SECRET_KEY}
       - HUAWEI_PROJECT_ID=${HUAWEI_PROJECT_ID}
-      - WEBHOOK_URL=${WEBHOOK_URL:-}
-      - EMAIL_USERNAME=${EMAIL_USERNAME:-}
-      - EMAIL_PASSWORD=${EMAIL_PASSWORD:-}
     volumes:
       # Mount config file for easy editing
       - ./config.yaml:/app/config.yaml:ro
@@ -26,33 +21,16 @@ services:
       - ./logs:/app/logs
       # Mount source code for development (optional)
       - ./app:/app/app:ro
+    command: ["gunicorn", "--bind", "0.0.0.0:7180", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:7180/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     networks:
       - cloudnap-network
-
-  # Optional: Add a reverse proxy for production-like setup
-  nginx:
-    image: nginx:alpine
-    container_name: cloudnap-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - cloudnap
-    restart: unless-stopped
-    networks:
-      - cloudnap-network
-    profiles:
-      - production
 
 networks:
   cloudnap-network:

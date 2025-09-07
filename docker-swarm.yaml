@@ -1,6 +1,4 @@
 # CloudNap - Docker Swarm Stack for Production
-version: '3.8'
-
 services:
   cloudnap:
     image: cloudnap:latest
@@ -46,9 +44,6 @@ services:
       - HUAWEI_ACCESS_KEY=${HUAWEI_ACCESS_KEY}
       - HUAWEI_SECRET_KEY=${HUAWEI_SECRET_KEY}
       - HUAWEI_PROJECT_ID=${HUAWEI_PROJECT_ID}
-      - WEBHOOK_URL=${WEBHOOK_URL}
-      - EMAIL_USERNAME=${EMAIL_USERNAME}
-      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
     configs:
       - source: cloudnap_config
         target: /app/config.yaml
@@ -63,6 +58,7 @@ services:
       - source: huawei_project_id
         target: /run/secrets/huawei_project_id
         mode: 0400
+    command: ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
     volumes:
       - cloudnap_logs:/app/logs
     networks:

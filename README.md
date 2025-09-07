@@ -119,8 +119,8 @@ clusters:
     description: "Cluster de producción"
     tags: ["production", "web"]
     schedule:
-      wake_up: "0 8 * * 1-5"    # Lunes a Viernes a las 8:00 AM
-      shutdown: "0 18 * * 1-5"  # Lunes a Viernes a las 6:00 PM
+      wake_up: "0 1 * * 1-5"    # Lunes a Viernes a las 1:00 AM UTC (9:00 AM SGT)
+      shutdown: "0 10 * * 1-5"  # Lunes a Viernes a las 10:00 AM UTC (6:00 PM SGT)
     enabled: true
 ```
 
@@ -174,13 +174,16 @@ curl http://localhost:5000/api/health
 
 ## 🕒 Programación de Tareas
 
-CloudNap utiliza expresiones cron para programar tareas:
+CloudNap utiliza expresiones cron para programar tareas **en UTC**:
 
 ```yaml
 schedule:
-  wake_up: "0 8 * * 1-5"    # Lunes a Viernes a las 8:00 AM
-  shutdown: "0 18 * * 1-5"  # Lunes a Viernes a las 6:00 PM
+  wake_up: "0 1 * * 1-5"    # Lunes a Viernes a las 1:00 AM UTC
+  shutdown: "0 10 * * 1-5"  # Lunes a Viernes a las 10:00 AM UTC
 ```
+
+> **⚠️ IMPORTANTE**: Todos los horarios están en UTC. Para convertir a tu zona horaria local, 
+> resta/agrega las horas correspondientes. Ejemplo: UTC+8 (Singapur) = UTC + 8 horas.
 
 ### Formato Cron
 
