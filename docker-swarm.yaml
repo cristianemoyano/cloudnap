@@ -1,0 +1,168 @@
+# CloudNap - Docker Swarm Stack for Production
+version: '3.8'
+
+services:
+  cloudnap:
+    image: cloudnap:latest
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        max_failure_ratio: 0.3
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        monitor: 30s
+        max_failure_ratio: 0.3
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          - node.role == worker
+        preferences:
+          - spread: node.id
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 40s
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+      - HUAWEI_ACCESS_KEY=${HUAWEI_ACCESS_KEY}
+      - HUAWEI_SECRET_KEY=${HUAWEI_SECRET_KEY}
+      - HUAWEI_PROJECT_ID=${HUAWEI_PROJECT_ID}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - EMAIL_USERNAME=${EMAIL_USERNAME}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+    configs:
+      - source: cloudnap_config
+        target: /app/config.yaml
+        mode: 0444
+    secrets:
+      - source: huawei_access_key
+        target: /run/secrets/huawei_access_key
+        mode: 0400
+      - source: huawei_secret_key
+        target: /run/secrets/huawei_secret_key
+        mode: 0400
+      - source: huawei_project_id
+        target: /run/secrets/huawei_project_id
+        mode: 0400
+    volumes:
+      - cloudnap_logs:/app/logs
+    networks:
+      - cloudnap-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:alpine
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        max_failure_ratio: 0.3
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        monitor: 30s
+        max_failure_ratio: 0.3
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    ports:
+      - "80:80"
+      - "443:443"
+    configs:
+      - source: nginx_config
+        target: /etc/nginx/nginx.conf
+        mode: 0444
+    volumes:
+      - ssl_certs:/etc/nginx/ssl:ro
+    depends_on:
+      - cloudnap
+    networks:
+      - cloudnap-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Log aggregation service
+  logspout:
+    image: gliderlabs/logspout:latest
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: syslog://logs.example.com:514
+    networks:
+      - cloudnap-network
+    profiles:
+      - logging
+
+networks:
+  cloudnap-network:
+    driver: overlay
+    attachable: true
+
+volumes:
+  cloudnap_logs:
+    driver: local
+  ssl_certs:
+    driver: local
+
+configs:
+  cloudnap_config:
+    file: ./config.yaml
+  nginx_config:
+    file: ./nginx.conf
+
+secrets:
+  huawei_access_key:
+    external: true
+  huawei_secret_key:
+    external: true
+  huawei_project_id:
+    external: true

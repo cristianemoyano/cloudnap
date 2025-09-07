@@ -1,0 +1,106 @@
+# CloudNap Configuration File
+# Configuración para gestión de clusters de Huawei Cloud
+
+# Configuración de Huawei Cloud
+huawei_cloud:
+  region: "ap-southeast-1"  # Región de Huawei Cloud
+  access_key: "${HUAWEI_ACCESS_KEY}"  # Variable de entorno
+  secret_key: "${HUAWEI_SECRET_KEY}"  # Variable de entorno
+  project_id: "${HUAWEI_PROJECT_ID}"  # Variable de entorno
+
+# Configuración de la aplicación
+app:
+  debug: false
+  host: "0.0.0.0"
+  port: 5000
+  log_level: "INFO"
+
+# Configuración de logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/cloudnap.log"
+  max_size: "10MB"
+  backup_count: 5
+
+# Clusters a gestionar
+clusters:
+  - name: "production-web-cluster"
+    instance_ids:
+      - "i-1234567890abcdef0"
+      - "i-1234567890abcdef1"
+      - "i-1234567890abcdef2"
+    region: "ap-southeast-1"
+    description: "Cluster de producción para aplicaciones web"
+    tags:
+      - "production"
+      - "web"
+      - "critical"
+    schedule:
+      wake_up: "0 8 * * 1-5"  # Lunes a Viernes a las 8:00 AM
+      shutdown: "0 18 * * 1-5"  # Lunes a Viernes a las 6:00 PM
+    enabled: true
+
+  - name: "staging-cluster"
+    instance_ids:
+      - "i-2345678901bcdefg0"
+      - "i-2345678901bcdefg1"
+    region: "ap-southeast-1"
+    description: "Cluster de staging para pruebas"
+    tags:
+      - "staging"
+      - "testing"
+    schedule:
+      wake_up: "0 9 * * 1-5"  # Lunes a Viernes a las 9:00 AM
+      shutdown: "0 17 * * 1-5"  # Lunes a Viernes a las 5:00 PM
+    enabled: true
+
+  - name: "development-cluster"
+    instance_ids:
+      - "i-3456789012cdefgh0"
+    region: "ap-southeast-1"
+    description: "Cluster de desarrollo"
+    tags:
+      - "development"
+      - "dev"
+    schedule:
+      wake_up: "0 10 * * 1-5"  # Lunes a Viernes a las 10:00 AM
+      shutdown: "0 16 * * 1-5"  # Lunes a Viernes a las 4:00 PM
+    enabled: false  # Deshabilitado por defecto
+
+  - name: "analytics-cluster"
+    instance_ids:
+      - "i-4567890123defghi0"
+      - "i-4567890123defghi1"
+      - "i-4567890123defghi2"
+      - "i-4567890123defghi3"
+    region: "ap-southeast-1"
+    description: "Cluster para procesamiento de datos y analytics"
+    tags:
+      - "analytics"
+      - "data-processing"
+      - "batch"
+    schedule:
+      wake_up: "0 2 * * 1"  # Lunes a las 2:00 AM
+      shutdown: "0 6 * * 1"  # Lunes a las 6:00 AM
+    enabled: true
+
+# Configuración del scheduler
+scheduler:
+  timezone: "Asia/Singapore"
+  max_workers: 4
+  coalesce: true
+  misfire_grace_time: 60
+
+# Configuración de notificaciones (opcional)
+notifications:
+  enabled: false
+  webhook_url: "${WEBHOOK_URL}"  # Variable de entorno
+  email:
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    username: "${EMAIL_USERNAME}"
+    password: "${EMAIL_PASSWORD}"
+    recipients:
+      - "admin@company.com"
+      - "devops@company.com"

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - CloudNap{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-cloud"></i> CloudNap Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- Clusters Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-server"></i> Clusters
+                </h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="refreshClusters()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                {% if clusters %}
+                    <div class="row">
+                        {% for cluster in clusters %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card cluster-card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">{{ cluster.name }}</h6>
+                                    <span class="badge bg-{{ 'success' if cluster.overall_status == 'running' else 'danger' if cluster.overall_status == 'stopped' else 'secondary' }}">
+                                        {{ cluster.overall_status.upper() }}
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text text-muted small">{{ cluster.description }}</p>
+                                    
+                                    <div class="mb-2">
+                                        <strong>Region:</strong> {{ cluster.region }}<br>
+                                        <strong>Instances:</strong> {{ cluster.instances|length }}<br>
+                                        <strong>Enabled:</strong> 
+                                        <span class="badge bg-{{ 'success' if cluster.enabled else 'secondary' }}">
+                                            {{ 'Yes' if cluster.enabled else 'No' }}
+                                        </span>
+                                    </div>
+                                    
+                                    {% if cluster.tags %}
+                                    <div class="mb-2">
+                                        {% for tag in cluster.tags %}
+                                        <span class="badge bg-light text-dark me-1">{{ tag }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="mb-2">
+                                        <strong>Instance Status:</strong>
+                                        <div class="mt-1">
+                                            {% for instance in cluster.instances %}
+                                            <small class="d-block">
+                                                <i class="bi bi-circle-fill status-{{ instance.status.lower() if instance.status else 'unknown' }}"></i>
+                                                {{ instance.id }}: {{ instance.status or 'unknown' }}
+                                            </small>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <div class="btn-group w-100" role="group">
+                                        <form method="POST" action="{{ url_for('main.start_cluster_web', cluster_name=cluster.name) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-success btn-sm" 
+                                                    onclick="return confirm('Start cluster {{ cluster.name }}?')">
+                                                <i class="bi bi-play-fill"></i> Start
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ url_for('main.stop_cluster_web', cluster_name=cluster.name) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Stop cluster {{ cluster.name }}?')">
+                                                <i class="bi bi-stop-fill"></i> Stop
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="bi bi-server display-1"></i>
+                        <p class="mt-3">No clusters configured</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scheduled Jobs Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock"></i> Scheduled Jobs
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if scheduled_jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Job ID</th>
+                                    <th>Name</th>
+                                    <th>Next Run</th>
+                                    <th>Trigger</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in scheduled_jobs %}
+                                <tr>
+                                    <td><code>{{ job.id }}</code></td>
+                                    <td>{{ job.name }}</td>
+                                    <td>
+                                        {% if job.next_run_time %}
+                                            <span class="text-muted">{{ job.next_run_time }}</span>
+                                        {% else %}
+                                            <span class="text-muted">Not scheduled</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><small class="text-muted">{{ job.trigger }}</small></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                onclick="triggerJob('{{ job.id }}')">
+                                            <i class="bi bi-play-fill"></i> Run Now
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="bi bi-clock display-4"></i>
+                        <p class="mt-3">No scheduled jobs</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Logs Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-journal-text"></i> Recent Logs
+                </h5>
+                <a href="{{ url_for('main.logs') }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye"></i> View All
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_logs %}
+                    <div class="log-container" style="max-height: 300px; overflow-y: auto;">
+                        {% for log in recent_logs %}
+                        <div class="log-entry mb-1 p-2 bg-light rounded">
+                            <small class="text-muted">{{ log.timestamp }}</small><br>
+                            <code>{{ log.message }}</code>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="bi bi-journal-text display-4"></i>
+                        <p class="mt-3">No recent logs</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function refreshClusters() {
+    location.reload();
+}
+
+function triggerJob(jobId) {
+    if (confirm('Trigger job ' + jobId + ' now?')) {
+        fetch('/api/scheduler/jobs/' + jobId + '/trigger', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Job triggered successfully');
+                location.reload();
+            } else {
+                alert('Failed to trigger job: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('Error triggering job: ' + error);
+        });
+    }
+}
+
+// Auto-refresh every 30 seconds
+setInterval(function() {
+    // Only refresh if user is on the page and not interacting
+    if (document.visibilityState === 'visible') {
+        location.reload();
+    }
+}, 30000);
+</script>
+{% endblock %}
