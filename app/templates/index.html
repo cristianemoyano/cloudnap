@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Dashboard - CloudNap{% endblock %}
+{% block timezone %}{{ timezone }}{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -23,14 +24,12 @@
                     <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse" data-bs-target="#cronHelp" aria-expanded="false">
                         <i class="bi bi-question-circle"></i> Cron Help
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" disabled title="Language support coming soon">
-                        <i class="bi bi-translate"></i> <span id="langToggle">EN</span>
-                    </button>
                     <button class="btn btn-sm btn-outline-primary" onclick="refreshClusters()">
                         <i class="bi bi-arrow-clockwise"></i> Refresh
                     </button>
                 </div>
             </div>
+            
             <div class="collapse" id="cronHelp">
                 <div class="card-body bg-light">
                     <h6><i class="bi bi-info-circle"></i> Cron Schedule Format</h6>
@@ -59,109 +58,147 @@
                     </div>
                 </div>
             </div>
-            <div class="card-body">
-                {% if clusters %}
-                    <div class="row">
-                        {% for cluster in clusters %}
-                        <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="card cluster-card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h6 class="mb-0">{{ cluster.name }}</h6>
-                                    <span class="badge bg-{{ 'success' if cluster.overall_status == 'running' else 'danger' if cluster.overall_status == 'stopped' else 'secondary' }}">
-                                        {{ cluster.overall_status.upper() }}
-                                    </span>
-                                </div>
-                                <div class="card-body">
-                                    <p class="card-text text-muted small">{{ cluster.description }}</p>
-                                    
-                                    <div class="mb-2">
-                                        <strong>Region:</strong> {{ cluster.region }}<br>
-                                        <strong>Instances:</strong> {{ cluster.instances|length }}<br>
-                                        <strong>Enabled:</strong> 
-                                        <span class="badge bg-{{ 'success' if cluster.enabled else 'secondary' }}">
-                                            {{ 'Yes' if cluster.enabled else 'No' }}
-                                        </span>
-                                    </div>
-                                    
-                                    {% if cluster.tags %}
-                                    <div class="mb-2">
-                                        {% for tag in cluster.tags %}
-                                        <span class="badge bg-light text-dark me-1">{{ tag }}</span>
-                                        {% endfor %}
-                                    </div>
-                                    {% endif %}
-                                    
-                                    <div class="mb-2">
-                                        <strong>Instance Status:</strong>
-                                        <div class="mt-1">
-                                            {% for instance in cluster.instances %}
-                                            <small class="d-block">
-                                                <i class="bi bi-circle-fill status-{{ instance.status.lower() if instance.status else 'unknown' }}"></i>
-                                                {{ instance.id }}: {{ instance.status or 'unknown' }}
-                                            </small>
-                                            {% endfor %}
+            
+            <!-- Filtros y búsqueda -->
+            <div class="card-body border-bottom">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" id="clusterSearch" placeholder="Buscar clusters por nombre...">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-tags"></i></span>
+                            <select class="form-select" id="tagFilter">
+                                <option value="">Todos los tags</option>
+                                <!-- Tags se llenarán dinámicamente -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <div class="d-flex flex-wrap gap-1" id="activeFilters">
+                            <!-- Filtros activos se mostrarán aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="container mt-4">
+                <!-- Contenedor con altura fija y scroll -->
+                <div class="overflow-auto" style="max-height: 600px;">
+                    <div class="row g-4">
+                        {% if clusters %}
+                            <div class="clusters-container">
+                                <div class="row" id="clustersList">
+                                    {% for cluster in clusters %}
+                                    <div class="col-md-6 col-lg-4 mb-3 cluster-item" 
+                                         data-cluster-name="{{ cluster.name|lower }}" 
+                                         data-cluster-tags="{{ cluster.tags|join(',')|lower }}">
+                                        <div class="card cluster-card h-100">
+                                            <div class="card-header d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0">{{ cluster.name }}</h6>
+                                                <span class="badge bg-{{ 'success' if cluster.overall_status == 'running' else 'danger' if cluster.overall_status == 'stopped' else 'secondary' }}">
+                                                    {{ cluster.overall_status.upper() }}
+                                                </span>
+                                            </div>
+                                            <div class="card-body">
+                                                <p class="card-text text-muted small">{{ cluster.description }}</p>
+                                                
+                                                <div class="mb-2">
+                                                    <strong>Region:</strong> {{ cluster.region }}<br>
+                                                    <strong>Instances:</strong> {{ cluster.instances|length }}<br>
+                                                    <strong>Enabled:</strong> 
+                                                    <span class="badge bg-{{ 'success' if cluster.enabled else 'secondary' }}">
+                                                        {{ 'Yes' if cluster.enabled else 'No' }}
+                                                    </span>
+                                                </div>
+                                                
+                                                {% if cluster.tags %}
+                                                <div class="mb-2">
+                                                    {% for tag in cluster.tags %}
+                                                    <span class="badge bg-light text-dark me-1">{{ tag }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                                {% endif %}
+                                                
+                                                <div class="mb-2">
+                                                    <strong>Instance Status:</strong>
+                                                    <div class="mt-1 instance-statuses">
+                                                        {% for instance in cluster.instances %}
+                                                        <small class="d-block status-loading">
+                                                            <i class="bi bi-circle-fill status-{{ instance.status.lower() if instance.status else 'unknown' }}"></i>
+                                                            {{ instance.id }}: {{ instance.status or 'loading' }}
+                                                        </small>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                                
+                                                {% if cluster.schedule %}
+                                                <div class="mb-2">
+                                                    <strong>Schedule:</strong>
+                                                    <div class="mt-1">
+                                                        <small class="text-muted mb-1 d-block">
+                                                            <i class="bi bi-clock"></i> Timezone: <strong>{{ timezone }}</strong>
+                                                        </small>
+                                                        {% if cluster.schedule.wake_up %}
+                                                        <small class="d-block">
+                                                            <i class="bi bi-sunrise text-warning" title="Wake up schedule"></i>
+                                                            <strong>Wake up:</strong> 
+                                                            <code class="schedule-cron">{{ cluster.schedule.wake_up }}</code>
+                                                            <i class="bi bi-info-circle text-muted schedule-info" 
+                                                               data-cron="{{ cluster.schedule.wake_up }}" 
+                                                               data-type="wake_up"
+                                                               title="Click to see human readable description"></i>
+                                                        </small>
+                                                        {% endif %}
+                                                        {% if cluster.schedule.shutdown %}
+                                                        <small class="d-block">
+                                                            <i class="bi bi-moon text-info" title="Shutdown schedule"></i>
+                                                            <strong>Shutdown:</strong> 
+                                                            <code class="schedule-cron">{{ cluster.schedule.shutdown }}</code>
+                                                            <i class="bi bi-info-circle text-muted schedule-info" 
+                                                               data-cron="{{ cluster.schedule.shutdown }}" 
+                                                               data-type="shutdown"
+                                                               title="Click to see human readable description"></i>
+                                                        </small>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="card-footer">
+                                                <div class="btn-group w-100" role="group">
+                                                    <button type="button" class="btn btn-success btn-sm cluster-action-btn" 
+                                                            data-cluster="{{ cluster.name }}" 
+                                                            data-action="start"
+                                                            onclick="handleClusterAction(this, 'start', '{{ cluster.name }}')">
+                                                        <i class="bi bi-play-fill"></i> <span class="btn-text">Start</span>
+                                                        </button>
+                                                    <button type="button" class="btn btn-danger btn-sm cluster-action-btn"
+                                                            data-cluster="{{ cluster.name }}" 
+                                                            data-action="stop"
+                                                            onclick="handleClusterAction(this, 'stop', '{{ cluster.name }}')">
+                                                        <i class="bi bi-stop-fill"></i> <span class="btn-text">Stop</span>
+                                                        </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    
-                                    {% if cluster.schedule %}
-                                    <div class="mb-2">
-                                        <strong>Schedule:</strong>
-                                        <div class="mt-1">
-                                            <small class="text-muted mb-1 d-block">
-                                                <i class="bi bi-clock"></i> Timezone: <strong>{{ timezone }}</strong>
-                                            </small>
-                                            {% if cluster.schedule.wake_up %}
-                                            <small class="d-block">
-                                                <i class="bi bi-sunrise text-warning" title="Wake up schedule"></i>
-                                                <strong>Wake up:</strong> 
-                                                <code class="schedule-cron">{{ cluster.schedule.wake_up }}</code>
-                                                <i class="bi bi-info-circle text-muted schedule-info" 
-                                                   data-cron="{{ cluster.schedule.wake_up }}" 
-                                                   data-type="wake_up"
-                                                   title="Click to see human readable description"></i>
-                                            </small>
-                                            {% endif %}
-                                            {% if cluster.schedule.shutdown %}
-                                            <small class="d-block">
-                                                <i class="bi bi-moon text-info" title="Shutdown schedule"></i>
-                                                <strong>Shutdown:</strong> 
-                                                <code class="schedule-cron">{{ cluster.schedule.shutdown }}</code>
-                                                <i class="bi bi-info-circle text-muted schedule-info" 
-                                                   data-cron="{{ cluster.schedule.shutdown }}" 
-                                                   data-type="shutdown"
-                                                   title="Click to see human readable description"></i>
-                                            </small>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                                <div class="card-footer">
-                                    <div class="btn-group w-100" role="group">
-                                        <form method="POST" action="{{ url_for('main.start_cluster_web', cluster_name=cluster.name) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-success btn-sm" 
-                                                    onclick="return confirm('Start cluster {{ cluster.name }}?')">
-                                                <i class="bi bi-play-fill"></i> Start
-                                            </button>
-                                        </form>
-                                        <form method="POST" action="{{ url_for('main.stop_cluster_web', cluster_name=cluster.name) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-danger btn-sm"
-                                                    onclick="return confirm('Stop cluster {{ cluster.name }}?')">
-                                                <i class="bi bi-stop-fill"></i> Stop
-                                            </button>
-                                        </form>
-                                    </div>
+                                    {% endfor %}
                                 </div>
                             </div>
-                        </div>
-                        {% endfor %}
+                        {% else %}
+                            <div class="text-center text-muted">
+                                <i class="bi bi-server display-1"></i>
+                                <p class="mt-3">No clusters configured</p>
+                            </div>
+                        {% endif %}
                     </div>
-                {% else %}
-                    <div class="text-center text-muted">
-                        <i class="bi bi-server display-1"></i>
-                        <p class="mt-3">No clusters configured</p>
-                    </div>
-                {% endif %}
+                </div>
             </div>
         </div>
     </div>
@@ -196,7 +233,13 @@
                                     <td>{{ job.name }}</td>
                                     <td>
                                         {% if job.next_run_time %}
-                                            <span class="text-muted">{{ job.next_run_time }}</span>
+                                            <span class="text-muted next-run-time" 
+                                                  data-utc-time="{{ job.next_run_time }}"
+                                                  data-bs-toggle="tooltip" 
+                                                  data-bs-placement="top"
+                                                  title="Click to see local time">
+                                                {{ job.next_run_time }}
+                                            </span>
                                         {% else %}
                                             <span class="text-muted">Not scheduled</span>
                                         {% endif %}
@@ -259,226 +302,17 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- CloudNap JavaScript Modules -->
+<script src="{{ url_for('static', filename='js/config.js') }}"></script>
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/clusters.js') }}"></script>
+<script src="{{ url_for('static', filename='js/filters.js') }}"></script>
+<script src="{{ url_for('static', filename='js/scheduler.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+<!-- Template-specific configuration -->
 <script>
-// Global variables
-let currentCronLanguage = 'en';
-const timezone = '{{ timezone }}';
-
-function refreshClusters() {
-    location.reload();
-}
-
-function toggleCronLanguage() {
-    // For now, we'll keep it simple and just use English
-    // In the future, we could implement a custom Spanish translator
-    currentCronLanguage = 'en';
-    document.getElementById('langToggle').textContent = 'EN';
-    
-    // Update all visible descriptions
-    document.querySelectorAll('.schedule-description.show').forEach(desc => {
-        const cronExpr = desc.getAttribute('data-cron');
-        if (cronExpr) {
-            const newDescription = parseCronExpression(cronExpr);
-            // Extract the type from the current description
-            const typeMatch = desc.innerHTML.match(/bi-(sunrise|moon)/);
-            const type = typeMatch ? (typeMatch[1] === 'sunrise' ? 'wake_up' : 'shutdown') : 'wake_up';
-            
-            desc.innerHTML = `
-                <i class="bi bi-${type === 'wake_up' ? 'sunrise' : 'moon'} me-1"></i>
-                <strong>${type === 'wake_up' ? 'Wake up' : 'Shutdown'}:</strong> ${newDescription}<br>
-                <small class="text-muted">
-                    <i class="bi bi-clock"></i> Timezone: <strong>${timezone}</strong>
-                </small>
-            `;
-        }
-    });
-}
-
-function triggerJob(jobId) {
-    if (confirm('Trigger job ' + jobId + ' now?')) {
-        fetch('/api/scheduler/jobs/' + jobId + '/trigger', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Job triggered successfully');
-                location.reload();
-            } else {
-                alert('Failed to trigger job: ' + data.error);
-            }
-        })
-        .catch(error => {
-            alert('Error triggering job: ' + error);
-        });
-    }
-}
-
-// Function to parse and display cron expression in human readable format using cronstrue
-function parseCronExpression(cronExpr) {
-    // Check if cronstrue is available
-    if (typeof cronstrue === 'undefined') {
-        console.warn('cronstrue library not loaded, using fallback parser');
-        return parseCronExpressionFallback(cronExpr);
-    }
-    
-    try {
-        // Use cronstrue library for professional cron parsing (English only for now)
-        return cronstrue.toString(cronExpr, {
-            throwExceptionOnParseError: false,
-            use24HourTimeFormat: false,
-            locale: 'en'
-        });
-    } catch (error) {
-        console.warn('Failed to parse cron expression with cronstrue:', cronExpr, error);
-        return parseCronExpressionFallback(cronExpr);
-    }
-}
-
-// Fallback parser for when cronstrue is not available
-function parseCronExpressionFallback(cronExpr) {
-    const parts = cronExpr.split(' ');
-    if (parts.length !== 5) return cronExpr;
-    
-    const [minute, hour, day, month, dayOfWeek] = parts;
-    let description = '';
-    
-    // Parse time
-    if (minute === '0' && hour !== '*') {
-        const hourInt = parseInt(hour);
-        if (hourInt === 0) {
-            description += 'At midnight (12:00 AM)';
-        } else if (hourInt < 12) {
-            description += `At ${hourInt}:00 AM`;
-        } else if (hourInt === 12) {
-            description += 'At noon (12:00 PM)';
-        } else {
-            description += `At ${hourInt - 12}:00 PM`;
-        }
-    } else if (minute !== '*' && hour !== '*') {
-        const hourInt = parseInt(hour);
-        if (hourInt === 0) {
-            description += `At 12:${minute.padStart(2, '0')} AM`;
-        } else if (hourInt < 12) {
-            description += `At ${hourInt}:${minute.padStart(2, '0')} AM`;
-        } else if (hourInt === 12) {
-            description += `At 12:${minute.padStart(2, '0')} PM`;
-        } else {
-            description += `At ${hourInt - 12}:${minute.padStart(2, '0')} PM`;
-        }
-    } else {
-        description += 'At specified time';
-    }
-    
-    // Parse day of week
-    if (dayOfWeek === '1-5') {
-        description += ' on weekdays (Monday to Friday)';
-    } else if (dayOfWeek === '0' || dayOfWeek === '7') {
-        description += ' on Sundays';
-    } else if (dayOfWeek === '1') {
-        description += ' on Mondays';
-    } else if (dayOfWeek === '6') {
-        description += ' on Saturdays';
-    } else if (dayOfWeek === '0,6') {
-        description += ' on weekends (Saturday and Sunday)';
-    } else if (dayOfWeek !== '*') {
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        description += ` on ${dayNames[parseInt(dayOfWeek)] || `day ${dayOfWeek}`}`;
-    }
-    
-    return description || cronExpr;
-}
-
-// Function to update current time display
-function updateCurrentTime() {
-    const now = new Date();
-    const timeString = now.toLocaleString('en-US', {
-        timeZone: timezone,
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-    });
-    
-    const currentTimeElement = document.getElementById('currentTime');
-    if (currentTimeElement) {
-        currentTimeElement.textContent = timeString;
-    }
-}
-
-// Add click handlers for schedule info icons
-document.addEventListener('DOMContentLoaded', function() {
-    // Update current time immediately and then every second
-    updateCurrentTime();
-    setInterval(updateCurrentTime, 1000);
-    
-    // Wait a bit for external libraries to load
-    setTimeout(function() {
-        // Check if cronstrue loaded successfully
-        if (typeof cronstrue !== 'undefined') {
-            console.log('cronstrue library loaded successfully');
-        } else {
-            console.warn('cronstrue library failed to load, using fallback parser');
-        }
-        
-        const infoIcons = document.querySelectorAll('.schedule-info');
-        infoIcons.forEach(icon => {
-        icon.addEventListener('click', function() {
-            const cronExpr = this.getAttribute('data-cron');
-            const type = this.getAttribute('data-type');
-            const description = parseCronExpression(cronExpr);
-            
-            // Find or create description element
-            let descElement = this.parentElement.querySelector('.schedule-description');
-            if (!descElement) {
-                descElement = document.createElement('div');
-                descElement.className = 'schedule-description';
-                this.parentElement.appendChild(descElement);
-            }
-            
-            // Toggle description
-            if (descElement.classList.contains('show')) {
-                descElement.classList.remove('show');
-                this.classList.remove('text-primary');
-            } else {
-                // Hide all other descriptions first
-                document.querySelectorAll('.schedule-description.show').forEach(el => {
-                    el.classList.remove('show');
-                });
-                document.querySelectorAll('.schedule-info.text-primary').forEach(el => {
-                    el.classList.remove('text-primary');
-                });
-                
-                // Show this description with timezone info
-                descElement.innerHTML = `
-                    <i class="bi bi-${type === 'wake_up' ? 'sunrise' : 'moon'} me-1"></i>
-                    <strong>${type === 'wake_up' ? 'Wake up' : 'Shutdown'}:</strong> ${description}<br>
-                    <small class="text-muted">
-                        <i class="bi bi-clock"></i> Timezone: <strong>${timezone}</strong>
-                    </small>
-                `;
-                descElement.setAttribute('data-cron', cronExpr);
-                descElement.classList.add('show');
-                this.classList.add('text-primary');
-            }
-        });
-    });
-    }, 100); // Small delay to ensure external libraries are loaded
-});
-
-// Auto-refresh every 30 seconds
-setInterval(function() {
-    // Only refresh if user is on the page and not interacting
-    if (document.visibilityState === 'visible') {
-        location.reload();
-    }
-}, 30000);
+// Set timezone for JavaScript modules
+window.timezone = '{{ timezone }}';
 </script>
 {% endblock %}

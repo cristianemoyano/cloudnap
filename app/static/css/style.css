@@ -51,6 +51,50 @@
     transform: scale(1.1);
 }
 
+/* Cluster action button styles */
+.cluster-action-btn.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.cluster-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cluster-action-btn .btn-text {
+    transition: all 0.2s ease;
+}
+
+/* Loading animation for buttons */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.bi-hourglass-split {
+    animation: spin 1s linear infinite;
+}
+
+/* Success and error states for cluster action buttons */
+.cluster-action-btn .bi-check-circle-fill {
+    color: #fff;
+}
+
+.cluster-action-btn .bi-exclamation-triangle-fill {
+    color: #fff;
+}
+
+/* Toast container styles */
+#toast-container {
+    z-index: 1055;
+}
+
+.toast {
+    min-width: 300px;
+}
+
 .schedule-description {
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
@@ -70,4 +114,234 @@
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+/* Spin animation for refresh button */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Clusters container with scroll */
+.clusters-container {
+    max-height: 600px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1.25rem;
+    padding-right: 1.5rem; /* Extra space for scrollbar */
+    position: relative;
+    background: #fff;
+    border-radius: 0.375rem;
+}
+
+/* Ensure the card body doesn't interfere with scrolling */
+.card-body {
+    padding: 0;
+    overflow: hidden; /* Prevent any overflow from card-body */
+}
+
+/* Custom scrollbar */
+.clusters-container::-webkit-scrollbar {
+    width: 8px;
+    
+    
+}
+
+.clusters-container::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin: 4px 0;
+}
+
+.clusters-container::-webkit-scrollbar-thumb {
+    background: #dee2e6;
+    border-radius: 4px;
+    border: 1px solid #f8f9fa;
+}
+
+.clusters-container::-webkit-scrollbar-thumb:hover {
+    background: #adb5bd;
+}
+
+.clusters-container::-webkit-scrollbar-thumb:active {
+    background: #6c757d;
+}
+
+/* Firefox scrollbar */
+.clusters-container {
+    scrollbar-width: thin;
+    scrollbar-color: #dee2e6 #f8f9fa;
+}
+
+/* Cluster item animations */
+.cluster-item {
+    transition: all 0.3s ease;
+    flex-shrink: 0; /* Prevent cards from shrinking */
+}
+
+.cluster-item.hidden {
+    display: none !important;
+}
+
+.cluster-item.fade-out {
+    opacity: 0;
+    transform: scale(0.95);
+}
+
+/* Ensure proper row behavior within scroll container */
+.clusters-container .row {
+    margin: 0;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.clusters-container .row > [class*="col-"] {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+/* Prevent cards from overflowing */
+.cluster-card {
+    max-width: 100%;
+    word-wrap: break-word;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.cluster-card .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Active filters */
+.filter-badge {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Search and filter inputs */
+#clusterSearch, #tagFilter {
+    transition: border-color 0.3s ease;
+}
+
+#clusterSearch:focus, #tagFilter:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Status indicators */
+.status-loading {
+    color: #6c757d;
+}
+
+.status-error {
+    color: #dc3545;
+}
+
+.status-running {
+    color: #198754;
+}
+
+.status-stopped {
+    color: #dc3545;
+}
+
+.status-unknown {
+    color: #6c757d;
+}
+
+/* Alert styles */
+.alert-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+/* Loading animation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.loading-pulse {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Scroll indicators */
+.clusters-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.8), transparent);
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.clusters-container::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: linear-gradient(to top, rgba(255,255,255,0.8), transparent);
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Show scroll indicators when content overflows */
+.clusters-container.scrollable-top::before {
+    opacity: 1;
+}
+
+.clusters-container.scrollable-bottom::after {
+    opacity: 1;
+}
+
+/* Force scroll behavior */
+.clusters-container {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* Ensure cards don't break out of container */
+.cluster-item {
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .clusters-container {
+        max-height: 500px;
+    }
+    
+    .clusters-container .row > [class*="col-"] {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+}
+
+/* Debug: Add border to see container boundaries */
+.clusters-container {
+    border: 2px solid #e9ecef;
+}
+
+.clusters-container:hover {
+    border-color: #0d6efd;
 }

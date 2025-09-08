@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Any
 from urllib.parse import urlencode
 
 from app.config import HuaweiCloudConfig, ClusterConfig
+from app.services.cache_service import cluster_cache
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class HuaweiCloudService:
                 params=query_params,
                 data=body,
                 headers=headers,
-                timeout=30
+                timeout=5  # Reduced timeout for faster failure in development
             )
             response.raise_for_status()
             return response.json()
@@ -110,8 +111,19 @@ class HuaweiCloudService:
             logger.error(f"Failed to get status for instance {instance_id}: {e}")
             return {"id": instance_id, "status": "unknown", "error": str(e)}
     
-    def get_cluster_status(self, cluster: ClusterConfig) -> Dict[str, Any]:
+    def get_cluster_status(self, cluster: ClusterConfig, use_cache: bool = True) -> Dict[str, Any]:
         """Get status of all instances in a cluster."""
+        cache_key = f"cluster_status:{cluster.name}"
+        
+        # Try to get from cache first
+        if use_cache:
+            cached_status = cluster_cache.get(cache_key)
+            if cached_status is not None:
+                logger.debug(f"Using cached status for cluster {cluster.name}")
+                return cached_status
+        
+        logger.debug(f"Fetching fresh status for cluster {cluster.name}")
+        
         cluster_status = {
             "name": cluster.name,
             "description": cluster.description,
@@ -138,6 +150,10 @@ class HuaweiCloudService:
             cluster_status["overall_status"] = "partial"
         else:
             cluster_status["overall_status"] = "unknown"
+        
+        # Cache the result
+        if use_cache:
+            cluster_cache.set(cache_key, cluster_status)
         
         return cluster_status
     
@@ -195,6 +211,9 @@ class HuaweiCloudService:
             
             result["instances"].append(instance_result)
         
+        # Invalidate cache after cluster action
+        cluster_cache.invalidate_cluster_cache(cluster.name)
+        
         return result
     
     def stop_cluster(self, cluster: ClusterConfig) -> Dict[str, Any]:
@@ -221,8 +240,47 @@ class HuaweiCloudService:
             
             result["instances"].append(instance_result)
         
+        # Invalidate cache after cluster action
+        cluster_cache.invalidate_cluster_cache(cluster.name)
+        
         return result
     
-    def get_all_clusters_status(self, clusters: List[ClusterConfig]) -> List[Dict[str, Any]]:
-        """Get status of all clusters."""
-        return [self.get_cluster_status(cluster) for cluster in clusters]
+    def get_all_clusters_status(self, clusters: List[ClusterConfig], use_cache: bool = True) -> List[Dict[str, Any]]:
+        """Get status of all clusters with error handling."""
+        cache_key = "all_clusters_status"
+        
+        # Try to get from cache first
+        if use_cache:
+            cached_results = cluster_cache.get(cache_key)
+            if cached_results is not None:
+                logger.debug("Using cached status for all clusters")
+                return cached_results
+        
+        logger.debug("Fetching fresh status for all clusters")
+        
+        results = []
+        for cluster in clusters:
+            try:
+                cluster_status = self.get_cluster_status(cluster, use_cache=use_cache)
+                results.append(cluster_status)
+            except Exception as e:
+                logger.warning(f"Failed to get status for cluster {cluster.name}: {e}")
+                # Return basic cluster info with error status
+                error_status = {
+                    "name": cluster.name,
+                    "description": cluster.description,
+                    "region": cluster.region,
+                    "tags": cluster.tags,
+                    "enabled": cluster.enabled,
+                    "schedule": cluster.schedule,
+                    "instances": [{"id": instance_id, "status": "error"} for instance_id in cluster.instance_ids],
+                    "overall_status": "error",
+                    "error": str(e)
+                }
+                results.append(error_status)
+        
+        # Cache the results
+        if use_cache:
+            cluster_cache.set(cache_key, results)
+        
+        return results

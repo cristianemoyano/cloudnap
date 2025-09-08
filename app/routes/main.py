@@ -14,8 +14,6 @@ logger = logging.getLogger(__name__)
 main_bp = Blueprint('main', __name__)
 
 # Initialize services
-huawei_service = HuaweiCloudService(config.huawei_cloud)
-scheduler_service = SchedulerService(config, huawei_service)
 logging_service = LoggingService(config.logging)
 
 
@@ -23,17 +21,30 @@ logging_service = LoggingService(config.logging)
 def index():
     """Main dashboard page."""
     try:
-        # Get clusters status
-        clusters_status = huawei_service.get_all_clusters_status(config.clusters)
+        # Get basic cluster info without API calls (fast loading)
+        clusters_basic = []
+        for cluster in config.clusters:
+            cluster_basic = {
+                "name": cluster.name,
+                "description": cluster.description,
+                "region": cluster.region,
+                "tags": cluster.tags,
+                "enabled": cluster.enabled,
+                "schedule": cluster.schedule,
+                "instances": [{"id": instance_id, "status": "loading"} for instance_id in cluster.instance_ids],
+                "overall_status": "loading"
+            }
+            clusters_basic.append(cluster_basic)
         
-        # Get scheduled jobs
-        scheduled_jobs = scheduler_service.get_scheduled_jobs()
+        # Get scheduled jobs from the app's scheduler service
+        from flask import current_app
+        scheduled_jobs = current_app.scheduler_service.get_scheduled_jobs()
         
         # Get recent logs (last 10)
         recent_logs = logging_service.get_recent_logs(10)
         
         return render_template('index.html', 
-                             clusters=clusters_status,
+                             clusters=clusters_basic,
                              scheduled_jobs=scheduled_jobs,
                              recent_logs=recent_logs,
                              timezone=config.scheduler.timezone)
@@ -42,7 +53,7 @@ def index():
         flash(f'Error loading dashboard: {e}', 'error')
         return render_template('index.html', 
                              clusters=[], 
-                             scheduled_jobs=[], 
+                             scheduled_jobs=[],
                              recent_logs=[],
                              timezone=config.scheduler.timezone)
 
@@ -56,7 +67,8 @@ def start_cluster_web(cluster_name: str):
             flash(f'Cluster {cluster_name} not found', 'error')
             return redirect(url_for('main.index'))
         
-        result = huawei_service.start_cluster(cluster)
+        from flask import current_app
+        result = current_app.huawei_service.start_cluster(cluster)
         
         # Log the action
         logging_service.log_cluster_action(
@@ -88,7 +100,8 @@ def stop_cluster_web(cluster_name: str):
             flash(f'Cluster {cluster_name} not found', 'error')
             return redirect(url_for('main.index'))
         
-        result = huawei_service.stop_cluster(cluster)
+        from flask import current_app
+        result = current_app.huawei_service.stop_cluster(cluster)
         
         # Log the action
         logging_service.log_cluster_action(
@@ -132,7 +145,8 @@ def cluster_status_ajax(cluster_name: str):
         if not cluster:
             return jsonify({'error': f'Cluster {cluster_name} not found'}), 404
         
-        cluster_status = huawei_service.get_cluster_status(cluster)
+        from flask import current_app
+        cluster_status = current_app.huawei_service.get_cluster_status(cluster)
         return jsonify(cluster_status)
     except Exception as e:
         logger.error(f"Failed to get cluster status for {cluster_name}: {e}")

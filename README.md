@@ -8,6 +8,9 @@
 - **Programación Automática**: Ejecuta tareas de encendido/apagado según horarios configurados (cron)
 - **API REST**: Endpoints para integración con otros sistemas
 - **Interfaz Web**: Dashboard moderno con Bootstrap para gestión visual
+- **Filtrado Inteligente**: Búsqueda por nombre y filtrado por tags para manejar listas largas
+- **Scroll Optimizado**: Contenedor con scroll inteligente y indicadores visuales
+- **Carga Asíncrona**: UI rápida con carga de estados en segundo plano
 - **Logging Completo**: Registro detallado de todas las operaciones
 - **Dockerizado**: Fácil despliegue con Docker y Docker Swarm
 - **Configuración Flexible**: Configuración mediante archivos YAML
@@ -119,8 +122,8 @@ clusters:
     description: "Cluster de producción"
     tags: ["production", "web"]
     schedule:
-      wake_up: "0 1 * * 1-5"    # Lunes a Viernes a las 1:00 AM UTC (9:00 AM SGT)
-      shutdown: "0 10 * * 1-5"  # Lunes a Viernes a las 10:00 AM UTC (6:00 PM SGT)
+      wake_up: "0 1 * * 1-5"    # Lunes a Viernes a las 1:00 AM UTC
+      shutdown: "0 10 * * 1-5"  # Lunes a Viernes a las 10:00 AM UTC
     enabled: true
 ```
 
@@ -155,6 +158,7 @@ FLASK_DEBUG=true
 - `GET /api/logs` - Obtener logs recientes
 - `GET /api/health` - Health check
 - `GET /api/config` - Obtener configuración (sin datos sensibles)
+- `POST /api/config/reload` - Recargar configuración desde archivo
 
 ### Ejemplos de Uso
 
@@ -170,7 +174,140 @@ curl http://localhost:5000/api/logs?lines=50
 
 # Health check
 curl http://localhost:5000/api/health
+
+# Recargar configuración (útil después de modificar config.yaml)
+curl -X POST http://localhost:5000/api/config/reload
 ```
+
+## 🔍 Filtrado y Búsqueda de Clusters
+
+CloudNap incluye un sistema avanzado de filtrado para manejar listas largas de clusters:
+
+### Funcionalidades de Filtrado
+
+#### 🔎 **Búsqueda por Nombre**
+- Busca clusters por nombre en tiempo real
+- Búsqueda case-insensitive
+- Coincidencias parciales
+
+#### 🏷️ **Filtrado por Tags**
+- Dropdown con todos los tags únicos
+- Filtrado instantáneo al seleccionar
+- Múltiples tags por cluster
+
+#### 📊 **Indicadores Visuales**
+- Badges que muestran filtros activos
+- Contador de resultados
+- Mensaje cuando no hay coincidencias
+
+#### 🎯 **Controles de Filtrado**
+- Botón para limpiar filtros individuales
+- Botón para limpiar todos los filtros
+- Filtros combinables (búsqueda + tags)
+
+### Ejemplo de Uso
+
+```yaml
+# Clusters con diferentes tags
+clusters:
+  - name: "production-web-cluster"
+    tags: ["production", "web"]
+  - name: "staging-api-cluster"  
+    tags: ["staging", "api", "backend"]
+  - name: "monitoring-cluster"
+    tags: ["monitoring", "infrastructure", "24x7"]
+```
+
+### Interfaz de Usuario
+
+1. **Campo de búsqueda**: Escribe el nombre del cluster
+2. **Selector de tags**: Elige un tag para filtrar
+3. **Filtros activos**: Ve qué filtros están aplicados
+4. **Scroll optimizado**: Navega por listas largas fácilmente
+
+## 📜 Scroll Inteligente
+
+CloudNap incluye un sistema de scroll optimizado para manejar listas largas de clusters:
+
+### 🎯 **Características del Scroll**
+
+#### **Contenedor con Altura Fija**
+- ✅ **Altura máxima**: 600px (500px en móviles)
+- ✅ **Scroll vertical**: Automático cuando el contenido excede la altura
+- ✅ **Sin scroll horizontal**: Previene desbordamiento lateral
+
+#### **Scrollbar Personalizada**
+- ✅ **Diseño moderno**: Scrollbar estilizada con colores Bootstrap
+- ✅ **Compatibilidad**: Funciona en Chrome, Firefox, Safari
+- ✅ **Interactiva**: Hover y estados activos
+
+#### **Indicadores Visuales**
+- ✅ **Gradientes**: Indicadores sutiles en la parte superior/inferior
+- ✅ **Dinámicos**: Aparecen solo cuando hay más contenido
+- ✅ **Responsivos**: Se actualizan al filtrar o redimensionar
+
+### 🎨 **Estilos de Scroll**
+
+```css
+.clusters-container {
+    max-height: 600px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #dee2e6 #f8f9fa;
+}
+```
+
+### 📱 **Responsive Design**
+
+| Dispositivo | Altura Máxima | Comportamiento |
+|-------------|---------------|----------------|
+| **Desktop** | 600px | Scroll completo |
+| **Tablet** | 600px | Scroll completo |
+| **Mobile** | 500px | Scroll optimizado |
+
+### 🔧 **Funcionalidades JavaScript**
+
+- ✅ **Detección automática** de contenido desbordado
+- ✅ **Indicadores dinámicos** que aparecen/desaparecen
+- ✅ **Actualización en tiempo real** al filtrar
+- ✅ **Compatibilidad** con filtros y búsqueda
+
+## ⚡ Rendimiento y Carga Asíncrona
+
+CloudNap está optimizado para cargar rápidamente incluso con muchos clusters:
+
+### 🚀 **Carga Rápida de UI**
+- **Carga inicial**: La interfaz se carga inmediatamente con información básica
+- **Estados de loading**: Indicadores visuales mientras se cargan los datos
+- **Carga asíncrona**: Los estados de clusters se cargan en segundo plano
+
+### 🛡️ **Manejo de Errores**
+- **Timeouts cortos**: 5 segundos para fallos rápidos en desarrollo
+- **Errores resilientes**: Un cluster con error no afecta a los demás
+- **Feedback visual**: Indicadores claros de errores de API
+
+### 📊 **Estados de Carga**
+
+| Estado | Descripción | Color |
+|--------|-------------|-------|
+| `LOADING` | Cargando información | Gris |
+| `RUNNING` | Cluster activo | Verde |
+| `STOPPED` | Cluster detenido | Rojo |
+| `ERROR` | Error de API | Amarillo |
+
+### 🔧 **Configuración de Timeouts**
+
+```python
+# En huawei_cloud_service.py
+timeout=5  # 5 segundos para desarrollo rápido
+```
+
+### 💡 **Beneficios**
+- ✅ **UI instantánea**: La página se carga en <1 segundo
+- ✅ **Experiencia fluida**: No hay bloqueos por errores de API
+- ✅ **Feedback claro**: Usuario sabe qué está pasando
+- ✅ **Escalable**: Funciona con 100+ clusters
 
 ## 🕒 Programación de Tareas
 
@@ -203,6 +340,28 @@ schedule:
 - `0 17 * * 1-5` - Lunes a Viernes a las 5:00 PM
 - `0 2 * * 1` - Todos los Lunes a las 2:00 AM
 - `0 0 1 * *` - Primer día de cada mes a medianoche
+
+## 🔄 Recarga de Configuración
+
+CloudNap permite recargar la configuración sin reiniciar la aplicación:
+
+### Desde la Interfaz Web
+1. Haz clic en el botón **"Refresh"** en el dashboard
+2. La aplicación recargará automáticamente el `config.yaml`
+3. Los nuevos clusters y horarios se aplicarán inmediatamente
+
+### Desde la API
+```bash
+# Recargar configuración
+curl -X POST http://localhost:5000/api/config/reload
+```
+
+### ¿Cuándo usar la recarga?
+- ✅ **Agregar nuevos clusters** al `config.yaml`
+- ✅ **Modificar horarios** de clusters existentes
+- ✅ **Habilitar/deshabilitar** clusters
+- ✅ **Cambiar configuración** del scheduler
+- ❌ **NO usar** para cambios en credenciales (requiere reinicio)
 
 ## 🐳 Docker
 

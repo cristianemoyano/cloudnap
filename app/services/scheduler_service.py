@@ -165,3 +165,19 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"Failed to trigger job {job_id}: {e}")
             return False
+    
+    def restart_scheduler(self) -> None:
+        """Restart scheduler with current configuration."""
+        try:
+            # Shutdown current scheduler
+            if self.scheduler.running:
+                self.scheduler.shutdown(wait=True)
+            
+            # Reinitialize scheduler
+            self._setup_scheduler()
+            self._schedule_cluster_jobs()
+            
+            logger.info("Scheduler restarted successfully")
+        except Exception as e:
+            logger.error(f"Failed to restart scheduler: {e}")
+            raise

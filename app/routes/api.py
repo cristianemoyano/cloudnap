@@ -6,8 +6,9 @@ from typing import Dict, Any
 
 from app.config import config
 from app.services.huawei_cloud_service import HuaweiCloudService
-from app.services.scheduler_service import SchedulerService
+# SchedulerService is now accessed via current_app.scheduler_service
 from app.services.logging_service import LoggingService
+from app.services.cache_service import cluster_cache
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,6 @@ logger = logging.getLogger(__name__)
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 # Initialize services
-huawei_service = HuaweiCloudService(config.huawei_cloud)
-scheduler_service = SchedulerService(config, huawei_service)
 logging_service = LoggingService(config.logging)
 
 
@@ -24,7 +23,8 @@ logging_service = LoggingService(config.logging)
 def get_clusters():
     """Get list of all clusters with their status."""
     try:
-        clusters_status = huawei_service.get_all_clusters_status(config.clusters)
+        from flask import current_app
+        clusters_status = current_app.huawei_service.get_all_clusters_status(config.clusters)
         return jsonify({
             'success': True,
             'data': clusters_status,
@@ -49,7 +49,8 @@ def get_cluster(cluster_name: str):
                 'error': f'Cluster {cluster_name} not found'
             }), 404
         
-        cluster_status = huawei_service.get_cluster_status(cluster)
+        from flask import current_app
+        cluster_status = current_app.huawei_service.get_cluster_status(cluster)
         return jsonify({
             'success': True,
             'data': cluster_status
@@ -108,7 +109,8 @@ def stop_cluster(cluster_name: str):
                 'error': f'Cluster {cluster_name} not found'
             }), 404
         
-        result = huawei_service.stop_cluster(cluster)
+        from flask import current_app
+        result = current_app.huawei_service.stop_cluster(cluster)
         
         # Log the action
         logging_service.log_cluster_action(
@@ -136,7 +138,8 @@ def stop_cluster(cluster_name: str):
 def get_scheduled_jobs():
     """Get list of all scheduled jobs."""
     try:
-        jobs = scheduler_service.get_scheduled_jobs()
+        from flask import current_app
+        jobs = current_app.scheduler_service.get_scheduled_jobs()
         return jsonify({
             'success': True,
             'data': jobs,
@@ -154,7 +157,8 @@ def get_scheduled_jobs():
 def trigger_job(job_id: str):
     """Trigger a scheduled job immediately."""
     try:
-        success = scheduler_service.trigger_job_now(job_id)
+        from flask import current_app
+        success = current_app.scheduler_service.trigger_job_now(job_id)
         if success:
             logging_service.log_scheduler_event('manual_trigger', job_id)
             return jsonify({
@@ -198,7 +202,8 @@ def health_check():
     """Health check endpoint."""
     try:
         # Check if services are running
-        scheduler_running = scheduler_service.scheduler.running if scheduler_service.scheduler else False
+        from flask import current_app
+        scheduler_running = current_app.scheduler_service.scheduler.running if current_app.scheduler_service.scheduler else False
         
         return jsonify({
             'success': True,
@@ -259,6 +264,124 @@ def get_config():
         })
     except Exception as e:
         logger.error(f"Failed to get config: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/config/reload', methods=['POST'])
+def reload_config():
+    """Reload configuration from file."""
+    try:
+        # Reload configuration
+        config.reload()
+        
+        # Restart scheduler with new configuration
+        from flask import current_app
+        current_app.scheduler_service.restart_scheduler()
+        
+        logger.info("Configuration reloaded successfully")
+        return jsonify({
+            'success': True,
+            'message': 'Configuration reloaded successfully'
+        })
+    except Exception as e:
+        logger.error(f"Failed to reload config: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/clusters/status', methods=['GET'])
+def get_clusters_status_async():
+    """Get clusters status asynchronously (for fast UI loading)."""
+    try:
+        # Check if we should force refresh (bypass cache)
+        force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+        use_cache = not force_refresh
+        
+        from flask import current_app
+        clusters_status = current_app.huawei_service.get_all_clusters_status(config.clusters, use_cache=use_cache)
+        return jsonify({
+            'success': True,
+            'data': clusters_status,
+            'cached': not force_refresh
+        })
+    except Exception as e:
+        logger.error(f"Failed to get clusters status: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/cache/stats', methods=['GET'])
+def get_cache_stats():
+    """Get cache statistics."""
+    try:
+        stats = cluster_cache.get_stats()
+        return jsonify({
+            'success': True,
+            'data': stats
+        })
+    except Exception as e:
+        logger.error(f"Failed to get cache stats: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/cache/clear', methods=['POST'])
+def clear_cache():
+    """Clear all cache entries."""
+    try:
+        cluster_cache.clear()
+        logger.info("Cache cleared via API")
+        return jsonify({
+            'success': True,
+            'message': 'Cache cleared successfully'
+        })
+    except Exception as e:
+        logger.error(f"Failed to clear cache: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/cache/cleanup', methods=['POST'])
+def cleanup_cache():
+    """Remove expired entries from cache."""
+    try:
+        removed_count = cluster_cache.cleanup_expired()
+        return jsonify({
+            'success': True,
+            'message': f'Cleaned up {removed_count} expired entries',
+            'removed_count': removed_count
+        })
+    except Exception as e:
+        logger.error(f"Failed to cleanup cache: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/cache/cluster/<cluster_name>/invalidate', methods=['POST'])
+def invalidate_cluster_cache(cluster_name: str):
+    """Invalidate cache for a specific cluster."""
+    try:
+        cluster_cache.invalidate_cluster_cache(cluster_name)
+        logger.info(f"Cache invalidated for cluster {cluster_name}")
+        return jsonify({
+            'success': True,
+            'message': f'Cache invalidated for cluster {cluster_name}'
+        })
+    except Exception as e:
+        logger.error(f"Failed to invalidate cache for cluster {cluster_name}: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

@@ -49,10 +49,10 @@ app = create_app()
 
 
 @app.teardown_appcontext
-def shutdown_scheduler(error):
-    """Shutdown scheduler when app context is torn down."""
-    if hasattr(app, 'scheduler_service'):
-        app.scheduler_service.stop()
+def cleanup_app_context(error):
+    """Cleanup app context when torn down."""
+    # Don't shutdown scheduler here - it should run for the entire app lifetime
+    pass
 
 
 if __name__ == '__main__':
