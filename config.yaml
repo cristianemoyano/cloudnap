@@ -29,230 +29,30 @@ logging:
 
 # Clusters a gestionar
 clusters:
-  - name: "production-web-cluster"
+  - name: "prod-api-cluster"
     instance_ids:
-      - "i-1234567890abcdef0"
       - "i-1234567890abcdef1"
-      - "i-1234567890abcdef2"
     region: "ap-southeast-1"
-    description: "Cluster de producción para aplicaciones web"
+    description: "Cluster de producción para aplicaciones api"
     tags:
-      - "production"
+      - "api"
+      - "prod"
     schedule:
       wake_up: "0 4 * * 1-5"  # Lunes a Viernes a las 4:00 AM UTC
       shutdown: "0 10 * * 1-5"  # Lunes a Viernes a las 10:00 AM UTC
     enabled: true
-  - name: "test-cluster-1"
+
+  - name: "prod-web-cluster"
     instance_ids:
-      - "i-test-001-a"
-      - "i-test-001-b"
+      - "i-1234567890abcdef2"
     region: "ap-southeast-1"
-    description: "Cluster de prueba 1 para desarrollo"
+    description: "Cluster de producción para aplicaciones api"
     tags:
-      - "test"
-      - "dev"
-    schedule:
-      wake_up: "0 8 * * 1-5"  # Lunes a Viernes a las 8:00 AM UTC
-      shutdown: "0 18 * * 1-5" # Lunes a Viernes a las 6:00 PM UTC
-    enabled: true
-  - name: "test-cluster-2"
-    instance_ids:
-      - "i-test-002-x"
-      - "i-test-002-y"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 2 para QA"
-    tags:
-      - "test"
-      - "qa"
-    schedule:
-      wake_up: "30 9 * * 1-5" # Lunes a Viernes a las 9:30 AM UTC
-      shutdown: "30 17 * * 1-5" # Lunes a Viernes a las 5:30 PM UTC
-    enabled: true
-  - name: "test-cluster-3"
-    instance_ids:
-      - "i-test-003-1"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 3, solo un servidor"
-    tags:
-      - "test"
-      - "single"
-    schedule:
-      wake_up: "0 7 * * *"    # Todos los días a las 7:00 AM UTC
-      shutdown: "0 20 * * *"  # Todos los días a las 8:00 PM UTC
-    enabled: true
-  - name: "test-cluster-4"
-    instance_ids:
-      - "i-test-004-alpha"
-      - "i-test-004-beta"
-      - "i-test-004-gamma"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 4 con múltiples instancias"
-    tags:
-      - "test"
-      - "multi"
-    schedule:
-      wake_up: "0 6 * * 2,4"  # Martes y Jueves a las 6:00 AM UTC
-      shutdown: "0 16 * * 2,4" # Martes y Jueves a las 4:00 PM UTC
-    enabled: true
-  - name: "test-cluster-5"
-    instance_ids:
-      - "i-test-005-main"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 5 para tareas nocturnas"
-    tags:
-      - "test"
-      - "nightly"
-    schedule:
-      wake_up: "0 22 * * *"   # Todos los días a las 10:00 PM UTC
-      shutdown: "0 2 * * *"   # Todos los días a las 2:00 AM UTC
-    enabled: true
-  - name: "test-cluster-6"
-    instance_ids:
-      - "i-test-006-db"
-      - "i-test-006-cache"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 6 para base de datos y caché"
-    tags:
-      - "test"
-      - "db"
-    schedule:
-      wake_up: "0 5 * * 1-5"  # Lunes a Viernes a las 5:00 AM UTC
-      shutdown: "0 19 * * 1-5" # Lunes a Viernes a las 7:00 PM UTC
-    enabled: true
-  - name: "test-cluster-7"
-    instance_ids:
-      - "i-test-007-worker"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 7 para workers de procesamiento"
-    tags:
-      - "test"
-      - "worker"
-    schedule:
-      wake_up: "0 1 * * *"    # Todos los días a la 1:00 AM UTC
-      shutdown: "0 3 * * *"   # Todos los días a las 3:00 AM UTC
-    enabled: true
-  - name: "test-cluster-8"
-    instance_ids:
-      - "i-test-008-frontend"
-      - "i-test-008-backend"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 8 para frontend y backend"
-    tags:
-      - "test"
       - "web"
+      - "prod"
     schedule:
-      wake_up: "0 9 * * 1-5"  # Lunes a Viernes a las 9:00 AM UTC
-      shutdown: "0 17 * * 1-5" # Lunes a Viernes a las 5:00 PM UTC
-    enabled: true
-  - name: "test-cluster-9"
-    instance_ids:
-      - "i-test-009-staging"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 9 para staging"
-    tags:
-      - "test"
-      - "staging"
-    schedule:
-      wake_up: "0 10 * * 1-5" # Lunes a Viernes a las 10:00 AM UTC
-      shutdown: "0 16 * * 1-5" # Lunes a Viernes a las 4:00 PM UTC
-    enabled: true
-  - name: "test-cluster-10"
-    instance_ids:
-      - "i-test-010-misc"
-      - "i-test-010-extra"
-    region: "ap-southeast-1"
-    description: "Cluster de prueba 10 para varios usos"
-    tags:
-      - "test"
-      - "misc"
-    schedule:
-      wake_up: "0 11 * * 3"   # Miércoles a las 11:00 AM UTC
-      shutdown: "0 15 * * 3"  # Miércoles a las 3:00 PM UTC
-    enabled: true
-  - name: "staging-api-cluster"
-    instance_ids:
-      - "i-staging-api-001"
-      - "i-staging-api-002"
-    region: "ap-southeast-1"
-    description: "Cluster de staging para APIs"
-    tags:
-      - "staging"
-      - "api"
-      - "backend"
-    schedule:
-      wake_up: "0 2 * * 1-5"  # Lunes a Viernes a las 2:00 AM UTC
-      shutdown: "0 12 * * 1-5"  # Lunes a Viernes a las 12:00 PM UTC
-    enabled: true
-  - name: "monitoring-cluster"
-    instance_ids:
-      - "i-monitoring-001"
-    region: "ap-southeast-1"
-    description: "Cluster para monitoreo y alertas"
-    tags:
-      - "monitoring"
-      - "infrastructure"
-      - "24x7"
-    schedule:
-      wake_up: "0 0 * * *"  # Todos los días a medianoche UTC
-      shutdown: "0 23 * * *"  # Todos los días a las 11:00 PM UTC
-    enabled: true
-  - name: "data-processing-cluster"
-    instance_ids:
-      - "i-data-001"
-      - "i-data-002"
-      - "i-data-003"
-    region: "ap-southeast-1"
-    description: "Cluster para procesamiento de datos"
-    tags:
-      - "data"
-      - "processing"
-      - "analytics"
-    schedule:
-      wake_up: "0 1 * * 1"  # Lunes a la 1:00 AM UTC
-      shutdown: "0 18 * * 5"  # Viernes a las 6:00 PM UTC
-    enabled: true
-  - name: "backup-cluster"
-    instance_ids:
-      - "i-backup-001"
-      - "i-backup-002"
-    region: "ap-southeast-1"
-    description: "Cluster para backups y almacenamiento"
-    tags:
-      - "backup"
-      - "storage"
-      - "infrastructure"
-    schedule:
-      wake_up: "0 2 * * 1"  # Lunes a las 2:00 AM UTC
-      shutdown: "0 20 * * 5"  # Viernes a las 8:00 PM UTC
-    enabled: true
-  - name: "development-cluster"
-    instance_ids:
-      - "i-dev-001"
-      - "i-dev-002"
-      - "i-dev-003"
-    region: "ap-southeast-1"
-    description: "Cluster de desarrollo para testing"
-    tags:
-      - "development"
-      - "testing"
-      - "dev"
-    schedule:
-      wake_up: "0 8 * * 1-5"  # Lunes a Viernes a las 8:00 AM UTC
-      shutdown: "0 18 * * 1-5"  # Lunes a Viernes a las 6:00 PM UTC
-    enabled: true
-  - name: "analytics-cluster"
-    instance_ids:
-      - "i-analytics-001"
-      - "i-analytics-002"
-    region: "ap-southeast-1"
-    description: "Cluster para análisis de datos y reportes"
-    tags:
-      - "analytics"
-      - "reporting"
-      - "data"
-    schedule:
-      wake_up: "0 1 * * 1"  # Lunes a la 1:00 AM UTC
-      shutdown: "0 17 * * 5"  # Viernes a las 5:00 PM UTC
+      wake_up: "0 4 * * 1-5"  # Lunes a Viernes a las 4:00 AM UTC
+      shutdown: "0 10 * * 1-5"  # Lunes a Viernes a las 10:00 AM UTC
     enabled: true
 
 # Configuración del scheduler

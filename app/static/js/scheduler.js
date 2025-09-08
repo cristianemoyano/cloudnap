@@ -6,6 +6,14 @@
 // Global variables for scheduler
 // Language is fixed to English
 
+// Global state for job filters
+const JobFilterManager = {
+    activeFilters: {
+        search: '',
+        type: ''
+    }
+};
+
 /**
  * Trigger a scheduled job
  */
@@ -106,6 +114,191 @@ function initializeTimeDisplay() {
 }
 
 /**
+ * Initialize job filters functionality
+ */
+function initializeJobFilters() {
+    debugLog('SCHEDULER', 'Initializing job filters...');
+    
+    // Add event listeners for job filters
+    const jobSearchInput = safeQuerySelector('#jobSearch');
+    if (jobSearchInput) {
+        const debouncedJobSearch = debounce(handleJobSearch, 300);
+        jobSearchInput.addEventListener('input', debouncedJobSearch);
+        debugLog('SCHEDULER', 'Job search input event listener added');
+    }
+    
+    const jobTypeFilter = safeQuerySelector('#jobTypeFilter');
+    if (jobTypeFilter) {
+        jobTypeFilter.addEventListener('change', handleJobTypeFilter);
+        debugLog('SCHEDULER', 'Job type filter event listener added');
+    }
+    
+    
+    debugLog('SCHEDULER', 'Job filters initialized successfully');
+}
+
+/**
+ * Handle job search input
+ */
+function handleJobSearch(event) {
+    JobFilterManager.activeFilters.search = event.target.value.toLowerCase();
+    applyJobFilters();
+}
+
+/**
+ * Handle job type filter change
+ */
+function handleJobTypeFilter(event) {
+    JobFilterManager.activeFilters.type = event.target.value.toLowerCase();
+    applyJobFilters();
+}
+
+
+/**
+ * Apply filters to job items
+ */
+function applyJobFilters() {
+    const jobItems = safeQuerySelectorAll('.job-item');
+    let visibleCount = 0;
+    
+    if (CONFIG.DEBUG.SHOW_FILTER_LOGS) {
+        debugLog('SCHEDULER', `Applying job filters to ${jobItems.length} job items`);
+        debugLog('SCHEDULER', 'Active job filters:', JobFilterManager.activeFilters);
+    }
+    
+    jobItems.forEach(item => {
+        const jobName = item.dataset.jobName;
+        const jobType = item.dataset.jobType;
+        
+        let matchesSearch = true;
+        let matchesType = true;
+        
+        // Check search filter
+        if (JobFilterManager.activeFilters.search) {
+            matchesSearch = jobName.includes(JobFilterManager.activeFilters.search);
+        }
+        
+        // Check type filter
+        if (JobFilterManager.activeFilters.type) {
+            matchesType = jobType === JobFilterManager.activeFilters.type;
+        }
+        
+        // Show/hide item
+        if (matchesSearch && matchesType) {
+            item.classList.remove(CONFIG.CLASSES.HIDDEN);
+            item.style.display = '';
+            visibleCount++;
+        } else {
+            item.classList.add(CONFIG.CLASSES.HIDDEN);
+            item.style.display = 'none';
+        }
+    });
+    
+    if (CONFIG.DEBUG.SHOW_FILTER_LOGS) {
+        debugLog('SCHEDULER', `Visible jobs after filtering: ${visibleCount}`);
+    }
+    
+    // Update active filters display
+    updateActiveJobFiltersDisplay();
+    
+    // Show message if no jobs match
+    showNoJobResultsMessage(visibleCount === 0);
+}
+
+/**
+ * Update active job filters display
+ */
+function updateActiveJobFiltersDisplay() {
+    const activeFiltersContainer = safeQuerySelector('#activeJobFilters');
+    if (!activeFiltersContainer) return;
+    
+    activeFiltersContainer.innerHTML = '';
+    
+    if (JobFilterManager.activeFilters.search) {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-primary filter-badge me-1';
+        badge.innerHTML = `<i class="bi ${CONFIG.ICONS.SEARCH} me-1"></i>Search: "${JobFilterManager.activeFilters.search}" <i class="bi ${CONFIG.ICONS.X_CIRCLE} ms-1" onclick="clearJobSearch()"></i>`;
+        activeFiltersContainer.appendChild(badge);
+    }
+    
+    if (JobFilterManager.activeFilters.type) {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-info filter-badge me-1';
+        badge.innerHTML = `<i class="bi ${CONFIG.ICONS.TAG} me-1"></i>Type: "${JobFilterManager.activeFilters.type}" <i class="bi ${CONFIG.ICONS.X_CIRCLE} ms-1" onclick="clearJobTypeFilter()"></i>`;
+        activeFiltersContainer.appendChild(badge);
+    }
+    
+}
+
+/**
+ * Clear job search filter
+ */
+function clearJobSearch() {
+    const searchInput = safeQuerySelector('#jobSearch');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    JobFilterManager.activeFilters.search = '';
+    applyJobFilters();
+}
+
+/**
+ * Clear job type filter
+ */
+function clearJobTypeFilter() {
+    const typeFilter = safeQuerySelector('#jobTypeFilter');
+    if (typeFilter) {
+        typeFilter.value = '';
+    }
+    JobFilterManager.activeFilters.type = '';
+    applyJobFilters();
+}
+
+
+/**
+ * Clear all job filters
+ */
+function clearAllJobFilters() {
+    clearJobSearch();
+    clearJobTypeFilter();
+}
+
+/**
+ * Show no job results message
+ */
+function showNoJobResultsMessage(show) {
+    let noResultsMsg = document.getElementById('noJobResultsMessage');
+    
+    if (show && !noResultsMsg) {
+        noResultsMsg = document.createElement('div');
+        noResultsMsg.id = 'noJobResultsMessage';
+        noResultsMsg.className = 'text-center text-muted py-4';
+        noResultsMsg.innerHTML = `
+            <i class="bi ${CONFIG.ICONS.SEARCH} display-4"></i>
+            <p class="mt-3">No jobs match your filters</p>
+            <button class="btn btn-sm btn-outline-secondary" onclick="clearAllJobFilters()">
+                <i class="bi ${CONFIG.ICONS.X_CIRCLE}"></i> Clear all filters
+            </button>
+        `;
+        
+        const jobsTable = safeQuerySelector('.table-responsive');
+        if (jobsTable) {
+            jobsTable.appendChild(noResultsMsg);
+        }
+    } else if (!show && noResultsMsg) {
+        noResultsMsg.remove();
+    }
+}
+
+/**
+ * Refresh scheduled jobs
+ */
+function refreshScheduledJobs() {
+    // Reload the page to refresh scheduled jobs data
+    location.reload();
+}
+
+/**
  * Initialize scheduler functionality
  */
 function initializeScheduler() {
@@ -113,6 +306,7 @@ function initializeScheduler() {
     
     initializeTimeDisplay();
     initializeScheduleInfoIcons();
+    initializeJobFilters();
     
     debugLog('SCHEDULER', 'Scheduler functionality initialized successfully');
 }
@@ -120,3 +314,7 @@ function initializeScheduler() {
 // Export functions for global access
 window.triggerJob = triggerJob;
 window.initializeScheduler = initializeScheduler;
+window.refreshScheduledJobs = refreshScheduledJobs;
+window.clearJobSearch = clearJobSearch;
+window.clearJobTypeFilter = clearJobTypeFilter;
+window.clearAllJobFilters = clearAllJobFilters;

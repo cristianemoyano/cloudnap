@@ -9,6 +9,9 @@
 function initializeFilters() {
     debugLog('FILTERS', 'Initializing filters...');
     
+    // Clear existing tags to prevent duplicates
+    ClusterManager.allTags.clear();
+    
     // Collect all unique tags
     const clusterItems = safeQuerySelectorAll(CONFIG.SELECTORS.CLUSTER_ITEMS);
     debugLog('FILTERS', `Found ${clusterItems.length} cluster items`);
@@ -23,6 +26,13 @@ function initializeFilters() {
     // Populate tag filter dropdown
     const tagFilter = safeQuerySelector(CONFIG.SELECTORS.TAG_FILTER);
     if (tagFilter) {
+        // Clear existing options except the first one (default option)
+        const defaultOption = tagFilter.querySelector('option[value=""]');
+        tagFilter.innerHTML = '';
+        if (defaultOption) {
+            tagFilter.appendChild(defaultOption);
+        }
+        
         ClusterManager.allTags.forEach(tag => {
             const option = document.createElement('option');
             option.value = tag;

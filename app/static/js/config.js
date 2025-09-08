@@ -74,6 +74,7 @@ const CONFIG = {
         SEARCH: 'bi-search',
         TAG: 'bi-tag',
         X_CIRCLE: 'bi-x-circle',
+        CALENDAR: 'bi-calendar',
     },
     
     // Button States
