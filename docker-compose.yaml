@@ -9,7 +9,7 @@ services:
     ports:
       - "7180:7180"
     environment:
-      - FLASK_ENV=development
+      - FLASK_ENV=production
       - FLASK_DEBUG=true
       - HUAWEI_ACCESS_KEY=${HUAWEI_ACCESS_KEY}
       - HUAWEI_SECRET_KEY=${HUAWEI_SECRET_KEY}
