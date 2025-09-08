@@ -17,7 +17,9 @@
             </a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="{{ url_for('main.index') }}">Clusters</a>
+                {% if not is_production %}
                 <a class="nav-link" href="{{ url_for('api.get_logs') }}">Logs</a>
+                {% endif %}
             </div>
         </div>
     </nav>

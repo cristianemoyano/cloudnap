@@ -1,7 +1,8 @@
 """API routes for CloudNap application."""
 
 import logging
-from flask import Blueprint, jsonify, request
+import os
+from flask import Blueprint, jsonify, request, abort
 from typing import Dict, Any
 
 from app.config import config
@@ -180,7 +181,11 @@ def trigger_job(job_id: str):
 
 @api_bp.route('/logs', methods=['GET'])
 def get_logs():
-    """Get recent application logs."""
+    """Get recent application logs - Only available in development."""
+    # In production, return 404
+    if os.getenv('FLASK_ENV') == 'production':
+        abort(404)
+    
     try:
         lines = request.args.get('lines', 100, type=int)
         logs = logging_service.get_recent_logs(lines)

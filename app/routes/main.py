@@ -1,6 +1,7 @@
 """Main web routes for CloudNap application."""
 
 import logging
+import os
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 
 from app.config import config
@@ -43,19 +44,24 @@ def index():
         # Get recent logs (last 10)
         recent_logs = logging_service.get_recent_logs(10)
         
+        # Check if we're in production mode
+        is_production = os.getenv('FLASK_ENV') == 'production'
+        
         return render_template('index.html', 
                              clusters=clusters_basic,
                              scheduled_jobs=scheduled_jobs,
                              recent_logs=recent_logs,
-                             timezone=config.scheduler.timezone)
+                             timezone=config.scheduler.timezone,
+                             is_production=is_production)
     except Exception as e:
         logger.error(f"Failed to load dashboard: {e}")
         flash(f'Error loading dashboard: {e}', 'error')
         return render_template('index.html', 
                              clusters=[], 
-                             scheduled_jobs=[],
+                             scheduled_jobs=[], 
                              recent_logs=[],
-                             timezone=config.scheduler.timezone)
+                             timezone=config.scheduler.timezone,
+                             is_production=os.getenv('FLASK_ENV') == 'production')
 
 
 @main_bp.route('/cluster/<cluster_name>/start', methods=['POST'])
@@ -126,7 +132,12 @@ def stop_cluster_web(cluster_name: str):
 
 @main_bp.route('/logs')
 def logs():
-    """Logs page."""
+    """Logs page - Only available in development."""
+    # In production, return 404
+    if os.getenv('FLASK_ENV') == 'production':
+        from flask import abort
+        abort(404)
+    
     try:
         lines = request.args.get('lines', 100, type=int)
         logs = logging_service.get_recent_logs(lines)
