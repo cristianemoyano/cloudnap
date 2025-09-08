@@ -28,7 +28,7 @@ services:
           cpus: '0.5'
           memory: 512M
       healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+        test: ["CMD", "curl", "-f", "http://localhost:7180/api/health"]
         interval: 30s
         timeout: 10s
         retries: 3
@@ -36,23 +36,14 @@ services:
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=false
-      - HUAWEI_ACCESS_KEY=${HUAWEI_ACCESS_KEY}
-      - HUAWEI_SECRET_KEY=${HUAWEI_SECRET_KEY}
-      - HUAWEI_PROJECT_ID=${HUAWEI_PROJECT_ID}
+    secrets:
+      - huawei_access_key
+      - huawei_secret_key
+      - huawei_project_id
     configs:
       - source: cloudnap_config
         target: /app/config.yaml
         mode: 0444
-    secrets:
-      - source: huawei_access_key
-        target: /run/secrets/huawei_access_key
-        mode: 0400
-      - source: huawei_secret_key
-        target: /run/secrets/huawei_secret_key
-        mode: 0400
-      - source: huawei_project_id
-        target: /run/secrets/huawei_project_id
-        mode: 0400
     command: ["gunicorn", "--bind", "0.0.0.0:7180", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
     networks:
       - cloudnap-network

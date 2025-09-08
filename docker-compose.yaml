@@ -9,9 +9,10 @@ services:
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=false
-      - HUAWEI_ACCESS_KEY=${HUAWEI_ACCESS_KEY}
-      - HUAWEI_SECRET_KEY=${HUAWEI_SECRET_KEY}
-      - HUAWEI_PROJECT_ID=${HUAWEI_PROJECT_ID}
+    secrets:
+      - huawei_access_key
+      - huawei_secret_key
+      - huawei_project_id
     volumes:
       # Mount config file for easy editing
       - ./config.yaml:/app/config.yaml:ro
@@ -60,3 +61,11 @@ networks:
 volumes:
   logs:
     driver: local
+
+secrets:
+  huawei_access_key:
+    file: ./secrets/huawei_access_key.txt
+  huawei_secret_key:
+    file: ./secrets/huawei_secret_key.txt
+  huawei_project_id:
+    file: ./secrets/huawei_project_id.txt

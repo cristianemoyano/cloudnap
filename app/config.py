@@ -5,6 +5,7 @@ import yaml
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from dotenv import load_dotenv
+from .services.secrets_service import secrets_service
 
 # Load environment variables
 load_dotenv()
@@ -85,9 +86,9 @@ class Config:
         huawei_config = self._config_data.get('huawei_cloud', {})
         self.huawei_cloud = HuaweiCloudConfig(
             region=huawei_config.get('region', 'ap-southeast-1'),
-            access_key=self._resolve_env_var(huawei_config.get('access_key', '')),
-            secret_key=self._resolve_env_var(huawei_config.get('secret_key', '')),
-            project_id=self._resolve_env_var(huawei_config.get('project_id', ''))
+            access_key=self._resolve_secret_or_env(huawei_config.get('access_key', '')),
+            secret_key=self._resolve_secret_or_env(huawei_config.get('secret_key', '')),
+            project_id=self._resolve_secret_or_env(huawei_config.get('project_id', ''))
         )
         
         # Application configuration
@@ -132,6 +133,27 @@ class Config:
                 enabled=cluster_data.get('enabled', True)
             )
             self.clusters.append(cluster)
+    
+    def _resolve_secret_or_env(self, value: str) -> str:
+        """Resolve Docker secret or environment variable references in configuration.
+        
+        Priority:
+        1. Docker secret (if secrets are available)
+        2. Environment variable (if value starts with ${})
+        3. Direct value
+        """
+        # First try to get from Docker secrets if available
+        if secrets_service.is_secrets_available():
+            secret_value = secrets_service.get_secret(value)
+            if secret_value is not None:
+                return secret_value
+        
+        # Fallback to environment variable resolution
+        if value.startswith('${') and value.endswith('}'):
+            env_var = value[2:-1]
+            return os.getenv(env_var, '')
+        
+        return value
     
     def _resolve_env_var(self, value: str) -> str:
         """Resolve environment variable references in configuration."""

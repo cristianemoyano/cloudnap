@@ -8,9 +8,9 @@
 # Configuración de Huawei Cloud
 huawei_cloud:
   region: "ap-southeast-1"  # Región de Huawei Cloud
-  access_key: "${HUAWEI_ACCESS_KEY}"  # Variable de entorno
-  secret_key: "${HUAWEI_SECRET_KEY}"  # Variable de entorno
-  project_id: "${HUAWEI_PROJECT_ID}"  # Variable de entorno
+  access_key: "huawei_access_key"  # Docker secret name
+  secret_key: "huawei_secret_key"  # Docker secret name
+  project_id: "huawei_project_id"  # Docker secret name
 
 # Configuración de la aplicación
 app:

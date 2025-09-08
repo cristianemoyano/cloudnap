@@ -134,6 +134,11 @@ logs/
 config.local.yaml
 ssl/
 
+# Docker secrets - NEVER commit these files
+secrets/*.txt
+!secrets/.gitkeep
+!secrets/README.md
+
 # IDE
 .vscode/
 .idea/
