@@ -8,6 +8,7 @@ from app.config import config
 from app.services.huawei_cloud_service import HuaweiCloudService
 from app.services.scheduler_service import SchedulerService
 from app.services.logging_service import LoggingService
+from app.services.health_service import HealthService
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ main_bp = Blueprint('main', __name__)
 
 # Initialize services
 logging_service = LoggingService(config.logging)
+health_service = HealthService()
 
 
 @main_bp.route('/')
@@ -162,3 +164,26 @@ def cluster_status_ajax(cluster_name: str):
     except Exception as e:
         logger.error(f"Failed to get cluster status for {cluster_name}: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/health')
+def health():
+    """Health check page."""
+    try:
+        # Run all health checks
+        health_results = health_service.run_all_health_checks()
+        
+        # Check if we're in production mode
+        is_production = os.getenv('FLASK_ENV') == 'production'
+        
+        return render_template('health.html', 
+                             health_data=health_results,
+                             timezone=config.scheduler.timezone,
+                             is_production=is_production)
+    except Exception as e:
+        logger.error(f"Failed to load health page: {e}")
+        flash(f'Error loading health page: {e}', 'error')
+        return render_template('health.html', 
+                             health_data=None,
+                             timezone=config.scheduler.timezone,
+                             is_production=os.getenv('FLASK_ENV') == 'production')

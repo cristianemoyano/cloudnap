@@ -10,6 +10,7 @@ from app.services.huawei_cloud_service import HuaweiCloudService
 # SchedulerService is now accessed via current_app.scheduler_service
 from app.services.logging_service import LoggingService
 from app.services.cache_service import cluster_cache
+from app.services.health_service import HealthService
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 # Initialize services
 logging_service = LoggingService(config.logging)
+health_service = HealthService()
 
 
 @api_bp.route('/clusters', methods=['GET'])
@@ -204,7 +206,7 @@ def get_logs():
 
 @api_bp.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint."""
+    """Basic health check endpoint."""
     try:
         # Check if services are running
         from flask import current_app
@@ -224,6 +226,61 @@ def health_check():
         return jsonify({
             'success': False,
             'status': 'unhealthy',
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/health/detailed', methods=['GET'])
+def detailed_health_check():
+    """Detailed health check endpoint with comprehensive system status."""
+    try:
+        # Run all health checks
+        health_results = health_service.run_all_health_checks()
+        
+        return jsonify({
+            'success': True,
+            'data': health_results
+        })
+    except Exception as e:
+        logger.error(f"Detailed health check failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/health/huawei', methods=['GET'])
+def huawei_health_check():
+    """Huawei Cloud specific health check."""
+    try:
+        huawei_health = health_service.check_huawei_cloud_connection()
+        
+        return jsonify({
+            'success': True,
+            'data': huawei_health
+        })
+    except Exception as e:
+        logger.error(f"Huawei health check failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@api_bp.route('/health/secrets', methods=['GET'])
+def secrets_health_check():
+    """Secrets service health check."""
+    try:
+        secrets_health = health_service.check_secrets_service()
+        
+        return jsonify({
+            'success': True,
+            'data': secrets_health
+        })
+    except Exception as e:
+        logger.error(f"Secrets health check failed: {e}")
+        return jsonify({
+            'success': False,
             'error': str(e)
         }), 500
 
