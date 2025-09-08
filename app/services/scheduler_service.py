@@ -7,6 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
+import pytz
 
 from app.config import Config, ClusterConfig
 from app.services.huawei_cloud_service import HuaweiCloudService
@@ -40,11 +41,15 @@ class SchedulerService:
             'misfire_grace_time': self.config.scheduler.misfire_grace_time
         }
         
+        # Force the timezone from config
+        configured_timezone = pytz.timezone(self.config.scheduler.timezone)
+        logger.info(f"Setting scheduler timezone to: {self.config.scheduler.timezone}")
+        
         self.scheduler = BackgroundScheduler(
             jobstores=jobstores,
             executors=executors,
             job_defaults=job_defaults,
-            timezone=self.config.scheduler.timezone
+            timezone=configured_timezone
         )
     
     def start(self) -> None:
@@ -52,6 +57,8 @@ class SchedulerService:
         if not self.scheduler.running:
             self.scheduler.start()
             logger.info("Scheduler started")
+            # Clear any existing jobs to ensure they use the correct timezone
+            self.scheduler.remove_all_jobs()
             self._schedule_cluster_jobs()
     
     def stop(self) -> None:
@@ -73,15 +80,17 @@ class SchedulerService:
         if 'wake_up' in cluster.schedule:
             cron_expr = cluster.schedule['wake_up']
             try:
+                # Create trigger with explicit timezone
+                trigger = CronTrigger.from_crontab(cron_expr, timezone=self.config.scheduler.timezone)
                 self.scheduler.add_job(
                     func=self._wake_up_cluster,
-                    trigger=CronTrigger.from_crontab(cron_expr),
+                    trigger=trigger,
                     args=[cluster],
                     id=f"{cluster_name}_wake_up",
                     name=f"Wake up {cluster_name}",
                     replace_existing=True
                 )
-                logger.info(f"Scheduled wake up job for {cluster_name}: {cron_expr}")
+                logger.info(f"Scheduled wake up job for {cluster_name}: {cron_expr} (timezone: {self.config.scheduler.timezone})")
             except Exception as e:
                 logger.error(f"Failed to schedule wake up job for {cluster_name}: {e}")
         
@@ -89,15 +98,17 @@ class SchedulerService:
         if 'shutdown' in cluster.schedule:
             cron_expr = cluster.schedule['shutdown']
             try:
+                # Create trigger with explicit timezone
+                trigger = CronTrigger.from_crontab(cron_expr, timezone=self.config.scheduler.timezone)
                 self.scheduler.add_job(
                     func=self._shutdown_cluster,
-                    trigger=CronTrigger.from_crontab(cron_expr),
+                    trigger=trigger,
                     args=[cluster],
                     id=f"{cluster_name}_shutdown",
                     name=f"Shutdown {cluster_name}",
                     replace_existing=True
                 )
-                logger.info(f"Scheduled shutdown job for {cluster_name}: {cron_expr}")
+                logger.info(f"Scheduled shutdown job for {cluster_name}: {cron_expr} (timezone: {self.config.scheduler.timezone})")
             except Exception as e:
                 logger.error(f"Failed to schedule shutdown job for {cluster_name}: {e}")
     

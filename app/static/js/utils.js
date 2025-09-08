@@ -339,7 +339,7 @@ function initializeTimezoneConversion() {
                     hour12: false
                 });
                 
-                // Format original time for display (remove the timezone offset for cleaner look)
+                // Format original time for display (remove timezone offset for cleaner look)
                 const originalTimeFormatted = originalTime.replace(/[+-]\d{2}:\d{2}$/, '');
                 
                 // Update tooltip with local time
