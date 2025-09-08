@@ -1,7 +1,7 @@
 # CloudNap - Docker Swarm Stack for Production
 services:
   cloudnap:
-    image: cloudnap:latest
+    image: clifford666/cloudnap:latest
     deploy:
       replicas: 2
       update_config:
@@ -59,15 +59,12 @@ services:
         target: /run/secrets/huawei_project_id
         mode: 0400
     command: ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
-    volumes:
-      - cloudnap_logs:/app/logs
     networks:
       - cloudnap-network
     logging:
-      driver: "json-file"
+      driver: "journald"
       options:
-        max-size: "10m"
-        max-file: "3"
+        tag: "cloudnap"
 
   nginx:
     image: nginx:alpine
@@ -113,30 +110,9 @@ services:
     networks:
       - cloudnap-network
     logging:
-      driver: "json-file"
+      driver: "journald"
       options:
-        max-size: "10m"
-        max-file: "3"
-
-  # Optional: Log aggregation service
-  logspout:
-    image: gliderlabs/logspout:latest
-    deploy:
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: syslog://logs.example.com:514
-    networks:
-      - cloudnap-network
-    profiles:
-      - logging
+        tag: "nginx"
 
 networks:
   cloudnap-network:
@@ -144,8 +120,6 @@ networks:
     attachable: true
 
 volumes:
-  cloudnap_logs:
-    driver: local
   ssl_certs:
     driver: local
 

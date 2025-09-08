@@ -20,23 +20,37 @@ class LoggingService:
     
     def _setup_logging(self) -> None:
         """Setup logging configuration."""
-        # Create logs directory if it doesn't exist
-        log_file_path = Path(self.config.file)
-        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        # Check if we're in production mode (using journald)
+        is_production = os.getenv('FLASK_ENV') == 'production'
         
-        # Configure root logger
-        logging.basicConfig(
-            level=getattr(logging, self.config.level.upper()),
-            format=self.config.format,
-            handlers=[
-                logging.StreamHandler(),  # Console output
-                logging.handlers.RotatingFileHandler(
-                    filename=self.config.file,
-                    maxBytes=self._parse_size(self.config.max_size),
-                    backupCount=self.config.backup_count
-                )
-            ]
-        )
+        if is_production:
+            # Production mode: Only use console output for journald
+            logging.basicConfig(
+                level=getattr(logging, self.config.level.upper()),
+                format=self.config.format,
+                handlers=[
+                    logging.StreamHandler()  # Only console output for journald
+                ]
+            )
+        else:
+            # Development mode: Use both console and file
+            # Create logs directory if it doesn't exist
+            log_file_path = Path(self.config.file)
+            log_file_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Configure root logger
+            logging.basicConfig(
+                level=getattr(logging, self.config.level.upper()),
+                format=self.config.format,
+                handlers=[
+                    logging.StreamHandler(),  # Console output
+                    logging.handlers.RotatingFileHandler(
+                        filename=self.config.file,
+                        maxBytes=self._parse_size(self.config.max_size),
+                        backupCount=self.config.backup_count
+                    )
+                ]
+            )
         
         # Set specific loggers
         logging.getLogger('apscheduler').setLevel(logging.WARNING)
@@ -58,6 +72,11 @@ class LoggingService:
     def get_recent_logs(self, lines: int = 100) -> List[Dict[str, Any]]:
         """Get recent log entries from the log file."""
         logs = []
+        
+        # In production mode, we don't have log files, so return empty list
+        if os.getenv('FLASK_ENV') == 'production':
+            return logs
+            
         try:
             if os.path.exists(self.config.file):
                 with open(self.config.file, 'r', encoding='utf-8') as file:

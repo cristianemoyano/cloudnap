@@ -55,8 +55,5 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY --chown=cloudnap:cloudnap . .
 
-# Create necessary directories
-RUN mkdir -p logs && chown -R cloudnap:cloudnap logs
-
 # Switch to non-root user
 USER cloudnap
