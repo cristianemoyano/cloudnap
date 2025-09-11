@@ -77,7 +77,8 @@ def start_cluster(cluster_name: str):
                 'error': f'Cluster {cluster_name} not found'
             }), 404
         
-        result = huawei_service.start_cluster(cluster)
+        from flask import current_app
+        result = current_app.huawei_service.start_cluster(cluster)
         
         # Log the action
         logging_service.log_cluster_action(
