@@ -27,12 +27,12 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-      healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:7180/api/health"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-        start_period: 40s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7180/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     environment:
       - FLASK_ENV=production
       - FLASK_DEBUG=false
@@ -40,10 +40,9 @@ services:
       - huawei_access_key
       - huawei_secret_key
       - huawei_project_id
-    configs:
-      - source: cloudnap_config
-        target: /app/config.yaml
-        mode: 0444
+    volumes:
+      # Mount config file for easy editing
+      - ./config.yaml:/app/config.yaml:ro
     command: ["gunicorn", "--bind", "0.0.0.0:7180", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
     networks:
       - cloudnap-network
@@ -84,12 +83,8 @@ services:
           memory: 128M
     ports:
       - 7181:7181
-    configs:
-      - source: nginx_config
-        target: /etc/nginx/nginx.conf
-        mode: 0444
     volumes:
-      - ssl_certs:/etc/nginx/ssl:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
     networks:
       - cloudnap-network
     logging:
@@ -97,20 +92,10 @@ services:
       options:
         tag: "nginx"
 
+
 networks:
   cloudnap-network:
-    driver: overlay
-    attachable: true
-
-volumes:
-  ssl_certs:
-    driver: local
-
-configs:
-  cloudnap_config:
-    file: ./config.yaml
-  nginx_config:
-    file: ./nginx.conf
+    external: true
 
 secrets:
   huawei_access_key:
