@@ -68,7 +68,7 @@ class HuaweiCloudService:
     def _make_request(self, method: str, endpoint: str, params: Dict[str, Any] = None, 
                      data: Dict[str, Any] = None) -> Dict[str, Any]:
         """Make authenticated request to Huawei Cloud API."""
-        url = f"{self.base_url}/{self.api_version}/{endpoint}"
+        url = f"{self.base_url}/{self.api_version}/{self.config.project_id}/{endpoint}"
         query_params = params or {}
         body = json.dumps(data) if data else ""
         
@@ -80,7 +80,7 @@ class HuaweiCloudService:
         }
         
         # Generate signature
-        signature = self._generate_signature(method, f"/{self.api_version}/{endpoint}", 
+        signature = self._generate_signature(method, f"/{self.api_version}/{self.config.project_id}/{endpoint}", 
                                            query_params, headers, body)
         headers["Authorization"] = signature
         
