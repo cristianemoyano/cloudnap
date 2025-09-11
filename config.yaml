@@ -29,7 +29,7 @@ logging:
 
 # Clusters a gestionar
 clusters:
-  - name: "scoreappv2dockerqa-worker-2"
+  - name: "qa-cluster"
     instance_ids:
       - "0855eaf1-c0a3-4674-9b32-b1d472ae4efe"
     region: "la-south-2"

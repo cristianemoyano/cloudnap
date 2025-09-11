@@ -14,6 +14,7 @@
 ## 📋 Requisitos
 
 - Docker y Docker Swarm
+- Python 3.13+ (para desarrollo local)
 - Credenciales de Huawei Cloud (Access Key, Secret Key, Project ID)
 - Instancias ECS de Huawei Cloud para gestionar
 
@@ -41,9 +42,9 @@
    nano config.yaml
    ```
 
-4. **Inicializar Docker Swarm** (si no está inicializado):
+4. **Crear red externa** (si no existe):
    ```bash
-   docker swarm init
+   docker network create --driver overlay --attachable cloudnap-network
    ```
 
 5. **Desplegar la aplicación**:
@@ -56,6 +57,8 @@
    - API: http://localhost:7181/api
 
 ### 💻 Desarrollo Local
+
+#### Opción 1: Docker Compose (Recomendado)
 
 1. **Clonar el repositorio**:
    ```bash
@@ -87,6 +90,34 @@
    - Web Interface: http://localhost:7181
    - API: http://localhost:7181/api
 
+#### Opción 2: Python Virtual Environment
+
+1. **Crear entorno virtual**:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   # o
+   venv\Scripts\activate     # Windows
+   ```
+
+2. **Instalar dependencias**:
+   ```bash
+   pip install -e .
+   # o para desarrollo con herramientas adicionales
+   pip install -e ".[dev]"
+   ```
+
+3. **Configurar variables de entorno**:
+   ```bash
+   cp env.example .env
+   # Editar .env con tus credenciales
+   ```
+
+4. **Ejecutar aplicación**:
+   ```bash
+   python -m app
+   ```
+
 ## ⚙️ Configuración
 
 ### Archivo config.yaml
@@ -96,22 +127,21 @@ El archivo `config.yaml` contiene la configuración de clusters y horarios:
 ```yaml
 # Configuración de Huawei Cloud
 huawei_cloud:
-  region: "ap-southeast-1"
+  region: "la-south-2"
   access_key: "huawei_access_key"  # Docker secret name
   secret_key: "huawei_secret_key"  # Docker secret name
   project_id: "huawei_project_id"  # Docker secret name
 
 # Clusters a gestionar
 clusters:
-  - name: "production-cluster"
+  - name: "qa-cluster"
     instance_ids:
-      - "i-1234567890abcdef0"
-      - "i-1234567890abcdef1"
-    region: "ap-southeast-1"
-    description: "Cluster de producción"
-    tags: ["production", "web"]
+      - "xxxx-yyyy"
+    region: "la-south-2"
+    description: "Cluster de QA para aplicaciones"
+    tags: ["qa"]
     schedule:
-      wake_up: "0 1 * * 1-5"    # Lunes a Viernes a las 1:00 AM UTC
+      wake_up: "0 4 * * 1-5"    # Lunes a Viernes a las 4:00 AM UTC
       shutdown: "0 10 * * 1-5"  # Lunes a Viernes a las 10:00 AM UTC
     enabled: true
 ```
@@ -136,7 +166,7 @@ clusters:
 curl http://localhost:7181/api/clusters
 
 # Iniciar un cluster
-curl -X POST http://localhost:7181/api/clusters/production-cluster/start
+curl -X POST http://localhost:7181/api/clusters/scoreappv2dockerqa-worker-2/start
 
 # Health check
 curl http://localhost:7181/api/health
@@ -191,6 +221,9 @@ docker stack deploy -c docker-swarm.yaml cloudnap
 
 # Eliminar stack
 docker stack rm cloudnap
+
+# Verificar red externa
+docker network ls | grep cloudnap
 ```
 
 ### Docker Compose
