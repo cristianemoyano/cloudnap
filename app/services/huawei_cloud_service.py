@@ -23,7 +23,7 @@ class HuaweiCloudService:
         """Initialize Huawei Cloud service."""
         self.config = config
         self.base_url = f"https://ecs.{config.region}.myhuaweicloud.com"
-        self.api_version = "v1"
+        self.api_version = "v2.1"
     
     def _generate_signature(self, method: str, uri: str, query_params: Dict[str, str], 
                           headers: Dict[str, str], body: str = "") -> str:
@@ -73,8 +73,9 @@ class HuaweiCloudService:
         body = json.dumps(data) if data else ""
         
         headers = {
-            "Content-Type": "application/json",
+            "Content-Type": "application/json;charset=UTF-8",
             "X-Sdk-Date": datetime.utcnow().isoformat() + "Z",
+            "X-Project-Id": self.config.project_id,
             "Host": f"ecs.{self.config.region}.myhuaweicloud.com"
         }
         
@@ -103,8 +104,7 @@ class HuaweiCloudService:
         try:
             response = self._make_request(
                 "GET",
-                f"cloudservers/{instance_id}",
-                {"project_id": self.config.project_id}
+                f"servers/{instance_id}"
             )
             return response.get("server", {})
         except Exception as e:
@@ -162,9 +162,8 @@ class HuaweiCloudService:
         try:
             self._make_request(
                 "POST",
-                f"cloudservers/{instance_id}/action",
-                {"project_id": self.config.project_id},
-                {"os-start": {}}
+                f"servers/{instance_id}/action",
+                data={"os-start": ""}
             )
             logger.info(f"Successfully started instance {instance_id}")
             return True
@@ -177,9 +176,8 @@ class HuaweiCloudService:
         try:
             self._make_request(
                 "POST",
-                f"cloudservers/{instance_id}/action",
-                {"project_id": self.config.project_id},
-                {"os-stop": {}}
+                f"servers/{instance_id}/action",
+                data={"os-stop": ""}
             )
             logger.info(f"Successfully stopped instance {instance_id}")
             return True
