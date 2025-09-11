@@ -25,6 +25,14 @@ function handleClusterAction(button, action, clusterName) {
         return;
     }
     
+    // Check if action is valid for current cluster status
+    if (!isActionValidForCluster(clusterName, action)) {
+        const actionText = action === 'start' ? 'Start' : 'Stop';
+        const currentStatus = getCurrentClusterStatus(clusterName);
+        showToast(CONFIG.TOAST_TYPES.ERROR, `Cannot ${actionText.toLowerCase()} cluster ${clusterName}. Current status: ${currentStatus}`);
+        return;
+    }
+    
     // Show confirmation dialog
     const actionText = action === 'start' ? 'Start' : 'Stop';
     if (!confirm(`${actionText} cluster ${clusterName}?`)) {
@@ -64,10 +72,8 @@ function handleClusterAction(button, action, clusterName) {
             debugLog('CLUSTER', `Success response for ${action} ${clusterName}:`, data.message);
             showClusterActionResult(clusterName, action, true, data.message);
             
-            // Refresh cluster statuses after a short delay
-            setTimeout(() => {
-                loadClusterStatuses(true);
-            }, CONFIG.CLUSTER_STATUS_REFRESH_DELAY);
+            // Start monitoring for status change with multiple retries
+            monitorClusterStatusChange(clusterName, action);
         } else {
             // Show error state
             debugLog('CLUSTER', `Error response for ${action} ${clusterName}:`, data.error);
@@ -167,16 +173,17 @@ function resetClusterActionButtons(clusterName, action) {
     const actionKey = `${clusterName}-${action}`;
     ClusterManager.activeActions.delete(actionKey);
     
-    // Re-enable all buttons for this cluster
+    // Get current cluster status to determine button states
+    const currentStatus = getCurrentClusterStatus(clusterName);
+    
+    // Reset all buttons for this cluster
     const clusterButtons = safeQuerySelectorAll(`[data-cluster="${clusterName}"]${CONFIG.SELECTORS.CLUSTER_ACTION_BTNS}`);
     clusterButtons.forEach(button => {
-        button.disabled = false;
-        button.classList.remove(CONFIG.CLASSES.DISABLED);
+        const actionType = button.dataset.action;
         
         // Reset button text and icon
         const btnText = button.querySelector('.btn-text');
         const icon = button.querySelector('i');
-        const actionType = button.dataset.action;
         
         if (btnText) {
             btnText.textContent = actionType === 'start' ? 'Start' : 'Stop';
@@ -193,7 +200,188 @@ function resetClusterActionButtons(clusterName, action) {
         } else {
             button.classList.add('btn-danger');
         }
+        
+        // Update button state based on current cluster status
+        const isValidAction = isActionValidForCluster(clusterName, actionType);
+        button.disabled = !isValidAction;
+        button.classList.toggle(CONFIG.CLASSES.DISABLED, !isValidAction);
+        
+        // Update tooltip
+        if (!isValidAction) {
+            button.title = `Cannot ${actionType} cluster. Current status: ${currentStatus}`;
+        } else {
+            button.title = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} cluster`;
+        }
     });
+}
+
+/**
+ * Check if an action is valid for the current cluster status
+ */
+function isActionValidForCluster(clusterName, action) {
+    const clusterCard = safeQuerySelector(`[data-cluster-name="${clusterName.toLowerCase()}"] .cluster-card`);
+    if (!clusterCard) return false;
+    
+    const statusBadge = clusterCard.querySelector(CONFIG.SELECTORS.STATUS_BADGES);
+    if (!statusBadge) return false;
+    
+    const currentStatus = statusBadge.textContent.trim().toLowerCase();
+    
+    // Define valid actions for each status
+    const validActions = {
+        'running': ['stop'],
+        'stopped': ['start'],
+        'starting': [], // No actions allowed while starting
+        'stopping': [], // No actions allowed while stopping
+        'powering_off': [], // No actions allowed while powering off
+        'powering_on': [], // No actions allowed while powering on
+        'rebooting': [], // No actions allowed while rebooting
+        'transitioning': [], // No actions allowed while transitioning
+        'partial': ['start', 'stop'], // Both actions allowed for partial state
+        'error': ['start', 'stop'], // Both actions allowed for error state
+        'unknown': ['start', 'stop'] // Both actions allowed for unknown state
+    };
+    
+    return validActions[currentStatus]?.includes(action) || false;
+}
+
+/**
+ * Get current cluster status text
+ */
+function getCurrentClusterStatus(clusterName) {
+    const clusterCard = safeQuerySelector(`[data-cluster-name="${clusterName.toLowerCase()}"] .cluster-card`);
+    if (!clusterCard) return 'UNKNOWN';
+    
+    const statusBadge = clusterCard.querySelector(CONFIG.SELECTORS.STATUS_BADGES);
+    if (!statusBadge) return 'UNKNOWN';
+    
+    return statusBadge.textContent.trim();
+}
+
+/**
+ * Update button states based on cluster status
+ */
+function updateClusterButtonStates(clusterName, clusterStatus) {
+    const clusterCard = safeQuerySelector(`[data-cluster-name="${clusterName.toLowerCase()}"] .cluster-card`);
+    if (!clusterCard) return;
+    
+    const startButton = clusterCard.querySelector('[data-action="start"]');
+    const stopButton = clusterCard.querySelector('[data-action="stop"]');
+    
+    if (startButton) {
+        const canStart = isActionValidForCluster(clusterName, 'start');
+        startButton.disabled = !canStart;
+        startButton.classList.toggle(CONFIG.CLASSES.DISABLED, !canStart);
+        
+        // Add visual indicator for disabled state
+        if (!canStart) {
+            startButton.title = `Cannot start cluster. Current status: ${clusterStatus}`;
+        } else {
+            startButton.title = 'Start cluster';
+        }
+    }
+    
+    if (stopButton) {
+        const canStop = isActionValidForCluster(clusterName, 'stop');
+        stopButton.disabled = !canStop;
+        stopButton.classList.toggle(CONFIG.CLASSES.DISABLED, !canStop);
+        
+        // Add visual indicator for disabled state
+        if (!canStop) {
+            stopButton.title = `Cannot stop cluster. Current status: ${clusterStatus}`;
+        } else {
+            stopButton.title = 'Stop cluster';
+        }
+    }
+}
+
+/**
+ * Monitor cluster status change after an action
+ */
+function monitorClusterStatusChange(clusterName, action) {
+    const expectedStatus = action === 'start' ? 'running' : 'stopped';
+    let retryCount = 0;
+    
+    debugLog('CLUSTER', `Starting status monitoring for ${clusterName} (${action}) - expecting ${expectedStatus}`);
+    
+    const checkStatus = () => {
+        retryCount++;
+        debugLog('CLUSTER', `Status check attempt ${retryCount}/${CONFIG.CLUSTER_STATUS_MAX_RETRIES} for ${clusterName}`);
+        
+        // Show monitoring indicator
+        showStatusMonitoringIndicator(clusterName, retryCount);
+        
+        // Fetch fresh status
+        fetch(`${CONFIG.ENDPOINTS.CLUSTER_STATUS}?force_refresh=true`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const clusterData = data.data.find(c => c.name === clusterName);
+                    if (clusterData) {
+                        // Determine current cluster status based on instances
+                        const currentStatus = determineClusterStatus(clusterData.instances);
+                        debugLog('CLUSTER', `Current status for ${clusterName}: ${currentStatus}`);
+                        
+                        // Check if we've reached the expected final status
+                        if (currentStatus === expectedStatus) {
+                            // Status changed as expected
+                            debugLog('CLUSTER', `Status change confirmed for ${clusterName}: ${expectedStatus}`);
+                            updateClusterStatuses(data.data);
+                            hideStatusMonitoringIndicator(clusterName);
+                            return; // Stop monitoring
+                        }
+                        
+                        // Update UI with current status (including intermediate states)
+                        updateClusterStatuses(data.data);
+                    }
+                }
+                
+                // Check if we should retry
+                if (retryCount < CONFIG.CLUSTER_STATUS_MAX_RETRIES) {
+                    debugLog('CLUSTER', `Status not yet changed for ${clusterName}, retrying in ${CONFIG.CLUSTER_STATUS_RETRY_DELAY}ms`);
+                    setTimeout(checkStatus, CONFIG.CLUSTER_STATUS_RETRY_DELAY);
+                } else {
+                    debugLog('CLUSTER', `Max retries reached for ${clusterName}, updating UI with current status`);
+                    updateClusterStatuses(data.data);
+                    hideStatusMonitoringIndicator(clusterName);
+                }
+            })
+            .catch(error => {
+                debugLog('CLUSTER', `Error monitoring status for ${clusterName}:`, error);
+                hideStatusMonitoringIndicator(clusterName);
+            });
+    };
+    
+    // Start monitoring after initial delay
+    setTimeout(checkStatus, CONFIG.CLUSTER_STATUS_REFRESH_DELAY);
+}
+
+/**
+ * Show status monitoring indicator
+ */
+function showStatusMonitoringIndicator(clusterName, retryCount) {
+    const clusterCard = safeQuerySelector(`[data-cluster-name="${clusterName.toLowerCase()}"] .cluster-card`);
+    if (!clusterCard) return;
+    
+    const statusBadge = clusterCard.querySelector(CONFIG.SELECTORS.STATUS_BADGES);
+    if (statusBadge) {
+        statusBadge.className = `badge bg-${CONFIG.STATUS_COLORS.LOADING}`;
+        statusBadge.textContent = `UPDATING... (${retryCount}/${CONFIG.CLUSTER_STATUS_MAX_RETRIES})`;
+    }
+}
+
+/**
+ * Hide status monitoring indicator
+ */
+function hideStatusMonitoringIndicator(clusterName) {
+    const clusterCard = safeQuerySelector(`[data-cluster-name="${clusterName.toLowerCase()}"] .cluster-card`);
+    if (!clusterCard) return;
+    
+    const statusBadge = clusterCard.querySelector(CONFIG.SELECTORS.STATUS_BADGES);
+    if (statusBadge) {
+        // Status will be updated by updateClusterStatuses
+        debugLog('CLUSTER', `Hiding monitoring indicator for ${clusterName}`);
+    }
 }
 
 /**
@@ -246,6 +434,89 @@ function loadClusterStatuses(forceRefresh = false) {
 }
 
 /**
+ * Map Huawei Cloud instance status to UI status
+ */
+function mapInstanceStatus(huaweiStatus) {
+    const statusMap = {
+        'ACTIVE': 'running',
+        'SHUTOFF': 'stopped',
+        'BUILD': 'starting',
+        'REBOOT': 'rebooting',
+        'HARD_REBOOT': 'rebooting',
+        'MIGRATING': 'starting',
+        'RESIZE': 'starting',
+        'VERIFY_RESIZE': 'starting',
+        'REVERT_RESIZE': 'starting',
+        'PASSWORD': 'starting',
+        'REBUILD': 'starting',
+        'RESCUE': 'starting',
+        'UNRESCUE': 'starting',
+        'SUSPENDED': 'stopped',
+        'PAUSED': 'stopped',
+        'SHELVED': 'stopped',
+        'SHELVED_OFFLOADED': 'stopped',
+        'ERROR': 'error'
+    };
+    
+    return statusMap[huaweiStatus] || 'unknown';
+}
+
+/**
+ * Map instance status to display text and color
+ */
+function getStatusDisplayInfo(status) {
+    const statusInfo = {
+        'running': { text: 'RUNNING', color: CONFIG.STATUS_COLORS.RUNNING, icon: CONFIG.ICONS.CIRCLE_FILL },
+        'stopped': { text: 'STOPPED', color: CONFIG.STATUS_COLORS.STOPPED, icon: CONFIG.ICONS.CIRCLE_FILL },
+        'starting': { text: 'STARTING', color: CONFIG.STATUS_COLORS.STARTING, icon: CONFIG.ICONS.HOURGLASS },
+        'stopping': { text: 'STOPPING', color: CONFIG.STATUS_COLORS.STOPPING, icon: CONFIG.ICONS.HOURGLASS },
+        'powering_off': { text: 'POWERING OFF', color: CONFIG.STATUS_COLORS.POWERING_OFF, icon: CONFIG.ICONS.HOURGLASS },
+        'powering_on': { text: 'POWERING ON', color: CONFIG.STATUS_COLORS.POWERING_ON, icon: CONFIG.ICONS.HOURGLASS },
+        'rebooting': { text: 'REBOOTING', color: CONFIG.STATUS_COLORS.REBOOTING, icon: CONFIG.ICONS.HOURGLASS },
+        'transitioning': { text: 'TRANSITIONING', color: CONFIG.STATUS_COLORS.TRANSITIONING, icon: CONFIG.ICONS.HOURGLASS },
+        'partial': { text: 'PARTIAL', color: CONFIG.STATUS_COLORS.PARTIAL, icon: CONFIG.ICONS.EXCLAMATION_TRIANGLE },
+        'error': { text: 'ERROR', color: CONFIG.STATUS_COLORS.ERROR, icon: CONFIG.ICONS.EXCLAMATION_TRIANGLE },
+        'unknown': { text: 'UNKNOWN', color: CONFIG.STATUS_COLORS.UNKNOWN, icon: CONFIG.ICONS.CIRCLE_FILL }
+    };
+    
+    return statusInfo[status] || statusInfo['unknown'];
+}
+
+/**
+ * Determine overall cluster status based on instance statuses
+ */
+function determineClusterStatus(instances) {
+    if (!instances || instances.length === 0) {
+        return 'unknown';
+    }
+    
+    const statuses = instances.map(instance => mapInstanceStatus(instance.status));
+    
+    // If any instance is in error state
+    if (statuses.includes('error')) {
+        return 'error';
+    }
+    
+    // If any instance is starting/stopping/rebooting
+    if (statuses.some(status => ['starting', 'stopping', 'powering_off', 'powering_on', 'rebooting'].includes(status))) {
+        return 'transitioning';
+    }
+    
+    // If all instances are running
+    if (statuses.every(status => status === 'running')) {
+        return 'running';
+    }
+    
+    // If all instances are stopped
+    if (statuses.every(status => status === 'stopped')) {
+        return 'stopped';
+    }
+    
+    // Mixed states
+    return 'partial';
+}
+
+/**
  * Update cluster statuses in the UI
  */
 function updateClusterStatuses(clustersData) {
@@ -253,26 +524,19 @@ function updateClusterStatuses(clustersData) {
         const clusterCard = safeQuerySelector(`[data-cluster-name="${clusterData.name.toLowerCase()}"] .cluster-card`);
         if (!clusterCard) return;
         
+        // Determine cluster status based on instances
+        const clusterStatus = determineClusterStatus(clusterData.instances);
+        const statusInfo = getStatusDisplayInfo(clusterStatus);
+        
         // Update overall status badge
         const statusBadge = clusterCard.querySelector(CONFIG.SELECTORS.STATUS_BADGES);
         if (statusBadge) {
-            let badgeClass = `badge bg-${CONFIG.STATUS_COLORS.UNKNOWN}`;
-            let statusText = 'UNKNOWN';
-            
-            if (clusterData.overall_status === 'running') {
-                badgeClass = `badge bg-${CONFIG.STATUS_COLORS.RUNNING}`;
-                statusText = 'RUNNING';
-            } else if (clusterData.overall_status === 'stopped') {
-                badgeClass = `badge bg-${CONFIG.STATUS_COLORS.STOPPED}`;
-                statusText = 'STOPPED';
-            } else if (clusterData.overall_status === 'error') {
-                badgeClass = `badge bg-${CONFIG.STATUS_COLORS.ERROR}`;
-                statusText = 'ERROR';
-            }
-            
-            statusBadge.className = badgeClass;
-            statusBadge.textContent = statusText;
+            statusBadge.className = `badge bg-${statusInfo.color}`;
+            statusBadge.textContent = statusInfo.text;
         }
+        
+        // Update button states based on cluster status
+        updateClusterButtonStates(clusterData.name, statusInfo.text);
         
         // Update instance statuses
         const instanceContainer = clusterCard.querySelector('.instance-statuses');
@@ -282,23 +546,17 @@ function updateClusterStatuses(clustersData) {
                 const instanceElement = document.createElement('small');
                 instanceElement.className = 'd-block';
                 
-                let statusIcon = CONFIG.ICONS.CIRCLE_FILL;
-                let statusClass = CONFIG.CLASSES.STATUS_UNKNOWN;
+                // Map Huawei Cloud status to UI status
+                const mappedStatus = mapInstanceStatus(instance.status);
+                const statusInfo = getStatusDisplayInfo(mappedStatus);
                 
-                if (instance.status === 'running') {
-                    statusIcon = CONFIG.ICONS.CIRCLE_FILL;
-                    statusClass = CONFIG.CLASSES.STATUS_RUNNING;
-                } else if (instance.status === 'stopped') {
-                    statusIcon = CONFIG.ICONS.CIRCLE_FILL;
-                    statusClass = CONFIG.CLASSES.STATUS_STOPPED;
-                } else if (instance.status === 'error') {
-                    statusIcon = CONFIG.ICONS.EXCLAMATION_TRIANGLE;
-                    statusClass = CONFIG.CLASSES.STATUS_ERROR;
-                }
+                // Add spinning animation for transitional states
+                const isTransitional = ['starting', 'stopping', 'powering_off', 'powering_on', 'rebooting'].includes(mappedStatus);
+                const spinClass = isTransitional ? CONFIG.CLASSES.SPIN : '';
                 
                 instanceElement.innerHTML = `
-                    <i class="bi ${statusIcon} ${statusClass}"></i>
-                    ${instance.id}: ${instance.status || 'unknown'}
+                    <i class="bi ${statusInfo.icon} ${spinClass}" style="color: var(--bs-${statusInfo.color})"></i>
+                    ${instance.id}: ${statusInfo.text}
                 `;
                 instanceContainer.appendChild(instanceElement);
             });

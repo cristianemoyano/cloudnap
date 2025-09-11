@@ -9,8 +9,10 @@ const CONFIG = {
     AUTO_REFRESH_INTERVAL: 30000,        // 30 seconds - UI auto-refresh
     CLOCK_UPDATE_INTERVAL: 1000,         // 1 second - Clock update
     // Action timeouts (in milliseconds)
-    BUTTON_RESET_DELAY: 3000,            // 3 seconds - Button reset after action
-    CLUSTER_STATUS_REFRESH_DELAY: 2000,  // 2 seconds - Cluster status refresh after action
+    BUTTON_RESET_DELAY: 5000,            // 5 seconds - Button reset after action
+    CLUSTER_STATUS_REFRESH_DELAY: 3000,  // 3 seconds - Initial cluster status refresh after action
+    CLUSTER_STATUS_RETRY_DELAY: 2000,    // 2 seconds - Delay between retry attempts
+    CLUSTER_STATUS_MAX_RETRIES: 5,       // 5 attempts - Maximum retries for status update
     TOAST_DISPLAY_DURATION: 5000,        // 5 seconds - Toast notification duration
     
     // UI Delays (in milliseconds)
@@ -94,6 +96,13 @@ const CONFIG = {
     STATUS_COLORS: {
         RUNNING: 'success',
         STOPPED: 'danger',
+        STARTING: 'info',
+        STOPPING: 'warning',
+        POWERING_OFF: 'warning',
+        POWERING_ON: 'info',
+        REBOOTING: 'info',
+        TRANSITIONING: 'info',
+        PARTIAL: 'warning',
         ERROR: 'warning',
         UNKNOWN: 'secondary',
         LOADING: 'secondary'
